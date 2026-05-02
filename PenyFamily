@@ -30,6 +30,9 @@ local Config = {
 	AfkArenaAuto = false,
 	AutoGetAfkReward = false,
 	AutoDropSam = false,
+	AutoGemGiftBox = false,
+	AutoBeriGiftBox = false,
+	GiftBoxDelay = 2.5,
 	FlySpeed = 300,
 
 	DropPinEnabled = true,
@@ -280,6 +283,9 @@ do
 		Config.AfkArenaAuto = false
 		Config.AutoGetAfkReward = false
 		Config.AutoDropSam = false
+		Config.AutoGemGiftBox = false
+		Config.AutoBeriGiftBox = false
+		Config.GiftBoxDelay = tonumber(Config.GiftBoxDelay) or 2.5
 		Config.FlySpeed = tonumber(Config.FlySpeed) or 300
 		Config.DropPinEnabled = Config.DropPinEnabled ~= false
 		Config.DropNoClip = Config.DropNoClip ~= false
@@ -1975,6 +1981,63 @@ local function runAutoDropSam()
 end
 
 
+--// AUTO GIFT BOX LOGIC
+local autoGemGiftBoxRunning = false
+local autoBeriGiftBoxRunning = false
+
+local function getGiftBoxDelay()
+	return math.clamp(tonumber(Config.GiftBoxDelay) or 2.5, 1, 30)
+end
+
+local function getUserDataFolder()
+	return workspace:WaitForChild("UserData"):WaitForChild("User_" .. player.UserId)
+end
+
+local function fireRewardRemote(remoteName)
+	local userFolder = getUserDataFolder()
+	local remote = userFolder:FindFirstChild(remoteName) or userFolder:WaitForChild(remoteName, 5)
+	if remote and remote.FireServer then
+		remote:FireServer("RewardMark")
+		task.wait(0.3)
+		remote:FireServer("RewardMark")
+		return true
+	end
+	return false
+end
+
+local function runAutoGemGiftBox()
+	if autoGemGiftBoxRunning then return end
+	autoGemGiftBoxRunning = true
+
+	task.spawn(function()
+		while Config.AutoGemGiftBox do
+			pcall(function()
+				fireRewardRemote("ClaimRewardDaily")
+			end)
+			task.wait(getGiftBoxDelay())
+		end
+
+		autoGemGiftBoxRunning = false
+	end)
+end
+
+local function runAutoBeriGiftBox()
+	if autoBeriGiftBoxRunning then return end
+	autoBeriGiftBoxRunning = true
+
+	task.spawn(function()
+		while Config.AutoBeriGiftBox do
+			pcall(function()
+				fireRewardRemote("ClaimRewardHourly")
+			end)
+			task.wait(getGiftBoxDelay())
+		end
+
+		autoBeriGiftBoxRunning = false
+	end)
+end
+
+
 --// AUTO SPAWN LOGIC
 local autoSpawnRunning = false
 local autoSpawnClickedLock = true
@@ -2153,7 +2216,7 @@ local farmingTab = createTab("Farming", 1)
 local settingTab = createTab("Setting", 2)
 
 -- Main
-local mainCard = card(mainTab, "Main", 20, 20, 560, 360)
+local mainCard = card(mainTab, "Main", 20, 20, 560, 520)
 label(mainCard, "Penny Hub Max UI", 20, 45, 300, 24)
 label(mainCard, "RightShift hoặc Left Alt để ẩn/hiện menu. Khi menu tắt, nút OPEN HUB sẽ hiện bên ngoài.", 20, 75, 500, 24)
 label(mainCard, "Các tab có thể cuộn chuột hoặc vuốt xuống để xem thêm.", 20, 105, 500, 24)
@@ -2228,6 +2291,34 @@ textbox(mainCard, "4", 135, 306, 80, 30,
 )
 
 label(mainCard, "Script Delay: thời gian chờ sau khi spawn rồi mới cho AFK/Fly/Drop hoạt động.", 20, 350, 520, 24)
+
+label(mainCard, "Gift Box Auto", 20, 385, 160, 24)
+toggle(mainCard, "AutoGemGiftBox", "Gem Gift Box", 20, 415, 240, 34, function(state)
+	if state then
+		runAutoGemGiftBox()
+	end
+end)
+
+toggle(mainCard, "AutoBeriGiftBox", "Beri Gift Box", 280, 415, 240, 34, function(state)
+	if state then
+		runAutoBeriGiftBox()
+	end
+end)
+
+label(mainCard, "Gift Delay", 20, 455, 120, 24)
+textbox(mainCard, "2.5", 100, 451, 80, 30,
+	function()
+		return tostring(Config.GiftBoxDelay or 2.5)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.GiftBoxDelay = math.clamp(n, 1, 30)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
 
 -- Farming
 local farmCard = card(farmingTab, "Farming", 20, 20, 560, 230)
@@ -2559,6 +2650,14 @@ button(configCard, "Load Selected", 15, 400, 85, 32, function()
 		if Config.AutoSpawn then
 			runAutoSpawn()
 		end
+
+		if Config.AutoGemGiftBox then
+			runAutoGemGiftBox()
+		end
+
+		if Config.AutoBeriGiftBox then
+			runAutoBeriGiftBox()
+		end
 	end
 end)
 
@@ -2606,6 +2705,14 @@ end
 
 if Config.AutoSpawn then
 	runAutoSpawn()
+end
+
+if Config.AutoGemGiftBox then
+	runAutoGemGiftBox()
+end
+
+if Config.AutoBeriGiftBox then
+	runAutoBeriGiftBox()
 end
 
 forceTopLayer(gui)
