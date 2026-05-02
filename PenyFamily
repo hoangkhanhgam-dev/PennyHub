@@ -1340,35 +1340,6 @@ local DROP_POSITIONS = {
 local autoRewardRunning = false
 local autoDropRunning = false
 local autoChangeNoAfkRewardsRunning = false
-
--- UI trạng thái cho Auto Change Account
-local autoChangeStatusLabel = nil
-local autoChangeBagLabel = nil
-local autoChangeUiLabel = nil
-local autoChangeLastValuesLabel = nil
-
-local function setAutoChangeLabel(obj, text, color)
-	if obj and obj.Parent then
-		obj.Text = text
-		if color then
-			obj.TextColor3 = color
-		end
-	end
-end
-
-local function updateAutoChangeStatus(statusText, bagText, uiText, valuesText, statusColor)
-	setAutoChangeLabel(autoChangeStatusLabel, "Status: " .. tostring(statusText or "Waiting"), statusColor or ThemeMain)
-	if bagText ~= nil then
-		setAutoChangeLabel(autoChangeBagLabel, "Bag check: " .. tostring(bagText), ThemeMain)
-	end
-	if uiText ~= nil then
-		setAutoChangeLabel(autoChangeUiLabel, "AFK UI check: " .. tostring(uiText), ThemeMain)
-	end
-	if valuesText ~= nil then
-		setAutoChangeLabel(autoChangeLastValuesLabel, tostring(valuesText), Color3.fromRGB(160, 170, 190))
-	end
-end
-
 local floatBV, floatBG
 local floatActive = false
 local actionBusy = false
@@ -1937,125 +1908,49 @@ local function doDropSamOnce(token)
 	dropAll("GoldenCompass", DROP_POSITIONS.GoldenCompass, token)
 end
 
---// AUTO CHANGE ACCOUNT IF AFK REWARD EMPTY
-local function getAfkUiForCheck()
-	local pg = player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui", 10)
-	if not pg then return nil end
-	return pg:FindFirstChild("AFK_UI") or pg:WaitForChild("AFK_UI", 8)
-end
-
-local function rewardsAllZero(v)
-	if type(v) ~= "table" then return false end
-	local keys = {"Beri", "Gem", "Compass", "SilverCompass", "GoldenCompass"}
-	for _, key in ipairs(keys) do
-		if v[key] == nil then
-			return false
-		end
-		if tonumber(v[key]) ~= 0 then
-			return false
-		end
-	end
-	return true
-end
-
+--// AUTO CHANGE ACCOUNT AFTER DROP SAM EMPTY
+-- Không check UI AFK Reward nữa. Chỉ cần sau khi drop xong mà Backpack/Character
+-- không còn Compass/Silver/Golden Compass thì tạo file và kick để tool đổi acc.
 local function writeDoneAndKick(reason)
+	local username = player.Name
+	local wroteFile = false
+
 	if writefile then
-		local username = player.Name
 		pcall(function()
-			writefile("done.txt", "")
+			-- Tạo file ngay trong workspace lớn của executor, ngang hàng PennyHubWorkspace/dex/SimpleSpy.
+			-- KHÔNG ghi vào PennyHubWorkspace và KHÔNG tạo done.txt.
 			writefile(username .. ".txt", "Completed-done")
+
+			wroteFile = true
+			print("[PennyHub] Created change-account file in executor workspace: " .. username .. ".txt")
 		end)
+	else
+		warn("[PennyHub] Executor không hỗ trợ writefile, không thể tạo " .. username .. ".txt.")
+	end
+
+	if not wroteFile then
+		warn("[PennyHub] Chưa tạo được file txt ngoài workspace lớn, vẫn kick theo logic Auto Change.")
 	end
 
 	task.wait(1)
-	player:Kick(reason or "No AFK rewards")
+	player:Kick(reason or "Drop Sam completed")
 end
 
-local function checkAfkRewardsAndChangeAccount(token)
+local function changeAccountAfterDropSam(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoChangeNoAfkRewards then return false end
 	if not isCharacterReady() then return false end
 
-	updateAutoChangeStatus("Checking bag...", "Đang quét Backpack/Character", "Chưa mở UI", "Beri=? | Gem=? | Compass=? | Silver=? | Golden=?", Color3.fromRGB(255, 210, 90))
-
-	-- Điều kiện 1: trong Backpack/Character không còn Compass/Silver/Golden.
+	-- Chỉ check túi đồ / character, không check số trong UI AFK Reward nữa.
+	-- Sau khi Auto Drop Sam chạy xong, nếu không còn Compass/Silver/Golden thì đổi acc.
 	if hasAnySamTool() then
-		updateAutoChangeStatus("Waiting", "CÒN Compass/Silver/Golden - chưa kick", "Chưa cần check UI", "Đợi drop hết compass rồi mới check UI AFK Reward.", Color3.fromRGB(255, 210, 90))
-		print("[PennyHub] Chưa change acc: vẫn còn Compass/Silver/Golden trong túi đồ hoặc trên nhân vật.")
+		print("[PennyHub] Chưa change acc: vẫn còn Compass/Silver/Golden sau khi drop.")
 		return false
 	end
 
-	updateAutoChangeStatus("Bag OK, opening AFK UI...", "KHÔNG còn Compass/Silver/Golden", "Đang mở NPC AFK Reward", "Đang bay về NPC để đọc số liệu UI.", Color3.fromRGB(90, 220, 130))
-
-	if not startFloat() then return false end
-
-	local npc = getAfkNpc()
-	local npcPart = getNpcPart(npc)
-	if npcPart then
-		if not flyTo(npcPart.Position + Vector3.new(0, 4, 5), token) then return false end
-		if token ~= actionToken or not Config.AutoChangeNoAfkRewards then return false end
-
-		local char, hrp = getChar()
-		if char and hrp then
-			hrp.CFrame = CFrame.lookAt(hrp.Position, npcPart.Position)
-			if floatBG then floatBG.CFrame = hrp.CFrame end
-		end
-
-		task.wait(0.25)
-		openAfkNpc()
-		task.wait(0.8)
-	else
-		warn("[PennyHub] Không tìm thấy part của AFK_NPC để check AFK Reward.")
-		return false
-	end
-
-	updateAutoChangeStatus("Reading AFK UI...", "KHÔNG còn Compass/Silver/Golden", "Đang đọc Beri/Gem/Compass/Silver/Golden", "Đang scan text trong AFK_UI.", Color3.fromRGB(255, 210, 90))
-
-	local afkUi = getAfkUiForCheck()
-	if not afkUi then
-		updateAutoChangeStatus("AFK UI not found", "KHÔNG còn Compass/Silver/Golden", "Không tìm thấy AFK_UI", "Không kick vì chưa xác nhận được số liệu UI.", Color3.fromRGB(255, 90, 90))
-		warn("[PennyHub] Không tìm thấy AFK_UI để check reward trước khi change acc.")
-		return false
-	end
-
-	local v = scanRewards(afkUi)
-	local uiIsZero = rewardsAllZero(v)
-	local noCompassTools = not hasAnySamTool()
-	local valuesText = ("Beri=%s | Gem=%s | Compass=%s | Silver=%s | Golden=%s"):format(
-		tostring(v.Beri),
-		tostring(v.Gem),
-		tostring(v.Compass),
-		tostring(v.SilverCompass),
-		tostring(v.GoldenCompass)
-	)
-
-	updateAutoChangeStatus(
-		(noCompassTools and uiIsZero) and "Ready to kick/change account" or "Waiting",
-		noCompassTools and "OK - không còn Compass/Silver/Golden" or "CÒN Compass/Silver/Golden",
-		uiIsZero and "OK - cả 5 mục đều = 0" or "CHƯA = 0 hết",
-		valuesText,
-		(noCompassTools and uiIsZero) and Color3.fromRGB(90, 220, 130) or Color3.fromRGB(255, 210, 90)
-	)
-
-	print(("[PennyHub] Check Change Acc | Bag Compass: %s | UI Zero: %s | Beri=%s Gem=%s Compass=%s Silver=%s Golden=%s"):format(
-		noCompassTools and "NO" or "YES",
-		tostring(uiIsZero),
-		tostring(v.Beri),
-		tostring(v.Gem),
-		tostring(v.Compass),
-		tostring(v.SilverCompass),
-		tostring(v.GoldenCompass)
-	))
-
-	-- Điều kiện 2: UI AFK Reward phải trả về 0 cả 5 mục.
-	-- Chỉ khi đủ CẢ 2 điều kiện mới kick để tool đổi acc.
-	if noCompassTools and uiIsZero then
-		updateAutoChangeStatus("Kicking for change account...", "OK - không còn Compass/Silver/Golden", "OK - cả 5 mục đều = 0", valuesText, Color3.fromRGB(90, 220, 130))
-		writeDoneAndKick("No AFK rewards")
-		return true
-	end
-
-	return false
+	print("[PennyHub] Auto Change: đã drop hết Compass/Silver/Golden, tạo file và kick đổi acc.")
+	writeDoneAndKick("Drop Sam completed")
+	return true
 end
 
 local function runAutoChangeNoAfkRewards()
@@ -2076,8 +1971,8 @@ local function runAutoChangeNoAfkRewards()
 				continue
 			end
 
-			-- Nếu Auto Get/Drop đang bật, check đổi acc sẽ được gọi ngay sau lượt claim/drop.
-			-- Khi chỉ bật riêng mục này, nó sẽ tự quay lại NPC mở UI và check định kỳ.
+			-- Nếu Auto Drop hoặc Auto Get đang bật, đổi acc sẽ được gọi ngay sau lượt drop.
+			-- Khi bật riêng mục này, nó chỉ check túi đồ định kỳ: hết Sam thì kick.
 			if Config.AutoGetAfkReward or Config.AutoDropSam then
 				task.wait(2)
 			else
@@ -2085,7 +1980,7 @@ local function runAutoChangeNoAfkRewards()
 				waitActionFree()
 
 				local ok, err = pcall(function()
-					checkAfkRewardsAndChangeAccount(myToken)
+					changeAccountAfterDropSam(myToken)
 				end)
 
 				releaseAction()
@@ -2137,7 +2032,7 @@ local function runGetAfkReward()
 
 				if Config.AutoChangeNoAfkRewards then
 					task.wait(0.5)
-					checkAfkRewardsAndChangeAccount(myToken)
+					changeAccountAfterDropSam(myToken)
 				end
 			end)
 
@@ -2187,7 +2082,7 @@ local function runAutoDropSam()
 
 					if Config.AutoChangeNoAfkRewards then
 						task.wait(0.5)
-						checkAfkRewardsAndChangeAccount(myToken)
+						changeAccountAfterDropSam(myToken)
 					end
 				end)
 
@@ -2794,7 +2689,7 @@ textbox(mainCard, "2.5", 100, 451, 80, 30,
 )
 
 -- Farming
-local farmCard = card(farmingTab, "Farming", 20, 20, 560, 455)
+local farmCard = card(farmingTab, "Farming", 20, 20, 560, 360)
 toggle(farmCard, "AfkArenaAuto", "Auto AFK Arena", 20, 50, 240, 34, function(state)
 	if state then
 		startAfk()
@@ -2819,24 +2714,13 @@ toggle(farmCard, "AutoDropSam", "Auto Drop Sam (Compass)", 20, 130, 240, 34, fun
 	end
 end)
 
-toggle(farmCard, "AutoChangeNoAfkRewards", "Auto change accounts if don't have AFK rewards", 20, 175, 510, 34, function(state)
+toggle(farmCard, "AutoChangeNoAfkRewards", "Auto change accounts after drop all Sam", 20, 175, 510, 34, function(state)
 	if state then
-		updateAutoChangeStatus("Enabled - waiting to check", "Chưa check", "Chưa check", "Bật auto để hub tự quét 2 điều kiện trước khi kick.", Color3.fromRGB(255, 210, 90))
 		runAutoChangeNoAfkRewards()
 	else
-		updateAutoChangeStatus("OFF", "Không check", "Không check", "Auto change account đang tắt.", Color3.fromRGB(160, 170, 190))
 		cancelCurrentAutoMove()
 	end
 end)
-
-label(farmCard, "Auto Change Check Monitor", 20, 218, 220, 24)
-autoChangeStatusLabel = label(farmCard, "Status: OFF", 20, 242, 510, 22)
-autoChangeBagLabel = label(farmCard, "Bag check: Không check", 20, 265, 510, 22)
-autoChangeUiLabel = label(farmCard, "AFK UI check: Không check", 20, 288, 510, 22)
-autoChangeLastValuesLabel = label(farmCard, "Auto change account đang tắt.", 20, 311, 510, 22)
-if Config.AutoChangeNoAfkRewards then
-	updateAutoChangeStatus("Enabled - waiting to check", "Chưa check", "Chưa check", "Bật auto để hub tự quét 2 điều kiện trước khi kick.", Color3.fromRGB(255, 210, 90))
-end
 
 toggle(farmCard, "DropPinEnabled", "Pin Position Khi Drop", 290, 50, 240, 34)
 toggle(farmCard, "DropNoClip", "NoClip Khi Drop", 290, 90, 240, 34)
@@ -2856,7 +2740,7 @@ textbox(farmCard, "3", 405, 131, 80, 30,
 	false
 )
 
-toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 350, 240, 34, function(state)
+toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 220, 240, 34, function(state)
 	if state then
 		-- Ưu tiên Auto Wood Rod: dừng các luồng bay/drop đang tranh quyền điều khiển nhân vật.
 		cancelCurrentAutoMove()
@@ -2866,8 +2750,8 @@ toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 350, 240, 34, fu
 	end
 end)
 
-label(farmCard, "Wood Rod TP Delay", 290, 353, 120, 24)
-textbox(farmCard, "2", 415, 349, 80, 30,
+label(farmCard, "Wood Rod TP Delay", 290, 223, 120, 24)
+textbox(farmCard, "2", 415, 219, 80, 30,
 	function()
 		return tostring(Config.WoodRodTPDelay or 2)
 	end,
@@ -2881,7 +2765,7 @@ textbox(farmCard, "2", 415, 349, 80, 30,
 	false
 )
 
-label(farmCard, "Auto Wood Rod: nhận/giao Package, check Wood Rod rồi equip và tự tắt.", 20, 395, 520, 24)
+label(farmCard, "Auto Wood Rod: nhận/giao Package, check Wood Rod rồi equip và tự tắt.", 20, 265, 520, 24)
 
 -- Setting: Webhook
 local webhookCard = card(settingTab, "Webhook", 20, 20, 360, 455)
