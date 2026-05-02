@@ -1,4 +1,4 @@
---// PENNY HUB - MAX LEVEL UI + AFK ARENA + WEBHOOK + CONFIG MANAGER
+--// PENNY HUB - MAX LEVEL UI + AUTO SPAWN + AFK ARENA + WEBHOOK + CONFIG MANAGER
 --// Full script đã gộp UI kính mờ + scroll từng danh mục + webhook chỉnh được + config tạo/lưu/load trong workspace
 --// Phím ẩn/hiện menu: RightShift
 
@@ -31,6 +31,11 @@ local Config = {
 	AutoGetAfkReward = false,
 	AutoDropSam = false,
 	FlySpeed = 300,
+
+	AutoSpawn = false,
+	AutoSpawnRespawnDelay = 3.5,
+	AutoSpawnUIStable = 1,
+	AutoSpawnScriptDelay = 4,
 
 	WebhookEnabled = false,
 	WebhookURL = "",
@@ -272,6 +277,10 @@ do
 		Config.AutoGetAfkReward = false
 		Config.AutoDropSam = false
 		Config.FlySpeed = tonumber(Config.FlySpeed) or 300
+		Config.AutoSpawn = false
+		Config.AutoSpawnRespawnDelay = tonumber(Config.AutoSpawnRespawnDelay) or 3.5
+		Config.AutoSpawnUIStable = tonumber(Config.AutoSpawnUIStable) or 1
+		Config.AutoSpawnScriptDelay = tonumber(Config.AutoSpawnScriptDelay) or 4
 		Config.WebhookEnabled = false
 		Config.WebhookURL = ""
 		Config.DiscordID = ""
@@ -463,7 +472,7 @@ local subtitle = Instance.new("TextLabel")
 subtitle.Parent = topbar
 subtitle.Size = UDim2.new(0, 420, 1, 0)
 subtitle.Position = UDim2.new(0, 145, 0, 1)
-subtitle.Text = "AFK Arena • Webhook • Config Manager"
+subtitle.Text = "Auto Spawn • AFK Arena • Webhook • Config Manager"
 subtitle.TextColor3 = Color3.fromRGB(160, 170, 190)
 subtitle.BackgroundTransparency = 1
 subtitle.Font = Enum.Font.Gotham
@@ -1327,15 +1336,98 @@ local function releaseAction()
 	actionBusy = false
 end
 
+--// CHARACTER READY GUARD
+-- Các auto khác chỉ được chạy khi nhân vật đã spawn thật sự và đã qua delay ổn định.
+-- Auto Spawn vẫn được phép chạy riêng để đưa nhân vật vào game.
+local characterReadyAt = 0
+
+local function getAutoSpawnScriptDelay()
+	return math.clamp(tonumber(Config.AutoSpawnScriptDelay) or 4, 0, 15)
+end
+
+local function markCharacterNotReady()
+	characterReadyAt = math.huge
+end
+
+local function markCharacterReadyAfterDelay()
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.Health > 0 then
+		characterReadyAt = tick() + getAutoSpawnScriptDelay()
+	else
+		characterReadyAt = math.huge
+	end
+end
+
+local function isCharacterReady()
+	local char = player.Character
+	if not char then return false end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+
+	if not hum or not hrp then return false end
+	if hum.Health <= 0 then return false end
+	if tick() < characterReadyAt then return false end
+
+	return true
+end
+
+local function waitUntilCharacterReady()
+	while gui.Parent and not isCharacterReady() do
+		task.wait(0.2)
+	end
+
+	return isCharacterReady()
+end
+
 local function getChar()
-	local char = player.Character or player.CharacterAdded:Wait()
-	local hrp = char:WaitForChild("HumanoidRootPart")
-	local hum = char:WaitForChild("Humanoid")
+	if not waitUntilCharacterReady() then
+		return nil, nil, nil
+	end
+
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+
 	return char, hrp, hum
 end
 
+local guardedCharacters = {}
+local function hookCharacterReadyGuard(char)
+	if not char or guardedCharacters[char] then return end
+	guardedCharacters[char] = true
+	markCharacterNotReady()
+
+	task.spawn(function()
+		local hum = char:WaitForChild("Humanoid", 10)
+		local hrp = char:WaitForChild("HumanoidRootPart", 10)
+		if hum and hrp and hum.Health > 0 then
+			markCharacterReadyAfterDelay()
+		end
+
+		if hum then
+			hum.Died:Connect(function()
+				markCharacterNotReady()
+			end)
+		end
+	end)
+end
+
+if player.Character then
+	hookCharacterReadyGuard(player.Character)
+end
+
+player.CharacterAdded:Connect(function(char)
+	hookCharacterReadyGuard(char)
+end)
+
 local function startFloat()
+	if not isCharacterReady() then return false end
+
 	local char, hrp, hum = getChar()
+	if not char or not hrp or not hum then return false end
+
 	floatActive = true
 	hum.PlatformStand = true
 	hum.Sit = false
@@ -1360,6 +1452,8 @@ local function startFloat()
 		floatBG.CFrame = hrp.CFrame
 		floatBG.Parent = hrp
 	end
+
+	return true
 end
 
 local function forceStopFloat()
@@ -1437,6 +1531,12 @@ task.spawn(function()
 		if not Config.AutoGetAfkReward and not Config.AutoDropSam then
 			stopFloatIfIdle()
 		else
+			if not isCharacterReady() then
+				forceStopFloat()
+				task.wait()
+				continue
+			end
+
 			if floatBV then
 				floatBV.Velocity = Vector3.new(0, 0, 0)
 			end
@@ -1452,12 +1552,17 @@ end)
 
 local function flyTo(pos, token)
 	token = token or actionToken
+	if not isCharacterReady() then
+		forceStopFloat()
+		return false
+	end
+
 	if not Config.AutoGetAfkReward and not Config.AutoDropSam then
 		forceStopFloat()
 		return false
 	end
 
-	startFloat()
+	if not startFloat() then return false end
 
 	local char, hrp = getChar()
 	local speed = tonumber(Config.FlySpeed) or 300
@@ -1572,7 +1677,10 @@ local function pressBackspace()
 end
 
 local function dropTool(tool)
+	if not isCharacterReady() then return end
+
 	local char, hrp, hum = getChar()
+	if not char or not hrp or not hum then return end
 
 	if not tool or not tool.Parent then return end
 
@@ -1616,7 +1724,8 @@ end
 local function doGetAfkRewardOnce(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoGetAfkReward then return end
-	startFloat()
+	if not isCharacterReady() then return end
+	if not startFloat() then return end
 
 	local npc = getAfkNpc()
 	local npcPart = getNpcPart(npc)
@@ -1627,6 +1736,7 @@ local function doGetAfkRewardOnce(token)
 		task.wait(0.2)
 
 		local char, hrp = getChar()
+		if not char or not hrp then return end
 		hrp.CFrame = CFrame.lookAt(hrp.Position, npcPart.Position)
 		if floatBG then floatBG.CFrame = hrp.CFrame end
 
@@ -1644,13 +1754,14 @@ end
 local function doDropSamOnce(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoDropSam then return end
+	if not isCharacterReady() then return end
 
 	if not hasAnySamTool() then
 		print("[PennyHub] Không có Compass/Silver/Golden để drop.")
 		return
 	end
 
-	startFloat()
+	if not startFloat() then return end
 	dropAll("Compass", DROP_POSITIONS.Compass, token)
 	dropAll("SilverCompass", DROP_POSITIONS.SilverCompass, token)
 	dropAll("GoldenCompass", DROP_POSITIONS.GoldenCompass, token)
@@ -1662,6 +1773,12 @@ local function runGetAfkReward()
 
 	task.spawn(function()
 		while Config.AutoGetAfkReward do
+			if not isCharacterReady() then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
 			local myToken = actionToken
 			waitActionFree()
 
@@ -1696,6 +1813,12 @@ local function runAutoDropSam()
 
 	task.spawn(function()
 		while Config.AutoDropSam do
+			if not isCharacterReady() then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
 			local myToken = actionToken
 			-- Nếu Auto Get AFK Reward cũng đang bật thì để Auto Get làm chủ luồng:
 			-- Claim xong rồi mới drop, tránh bị kéo về NPC giữa lúc đang drop.
@@ -1723,13 +1846,186 @@ local function runAutoDropSam()
 	end)
 end
 
+
+--// AUTO SPAWN LOGIC
+local autoSpawnRunning = false
+local autoSpawnClickedLock = true
+local autoSpawnHookedChars = {}
+
+local function getAutoSpawnRespawnDelay()
+	return math.clamp(tonumber(Config.AutoSpawnRespawnDelay) or 3.5, 0.5, 15)
+end
+
+local function getAutoSpawnUIStable()
+	return math.clamp(tonumber(Config.AutoSpawnUIStable) or 1, 0, 10)
+end
+
+local function findSpawnButton()
+	local pg = player:FindFirstChild("PlayerGui")
+	if not pg then return nil end
+
+	for _, v in ipairs(pg:GetDescendants()) do
+		if v:IsA("TextButton") and v.Text == "Spawn" and v.Visible then
+			return v
+		end
+	end
+
+	return nil
+end
+
+local function isLoadFrameVisible()
+	local pg = player:FindFirstChild("PlayerGui")
+	if not pg then return false end
+
+	local load = pg:FindFirstChild("Load")
+	local frame = load and load:FindFirstChild("Frame")
+
+	return frame and frame.Visible == true
+end
+
+local function hideSpawnUI()
+	local pg = player:FindFirstChild("PlayerGui")
+	if not pg then return end
+
+	local load = pg:FindFirstChild("Load")
+	if load and load:FindFirstChild("Frame") then
+		load.Frame.Visible = false
+	end
+end
+
+local function fixAfterAutoSpawn()
+	task.spawn(function()
+		local char
+		local hum
+
+		for i = 1, 100 do
+			char = player.Character
+			hum = char and char:FindFirstChildOfClass("Humanoid")
+
+			if char and hum and hum.Health > 0 then
+				break
+			end
+
+			task.wait(0.1)
+		end
+
+		if not hum then return end
+
+		markCharacterReadyAfterDelay()
+
+		for i = 1, 120 do
+			hideSpawnUI()
+
+			workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+			workspace.CurrentCamera.CameraSubject = hum
+
+			task.wait(0.05)
+		end
+	end)
+end
+
+local function clickAutoSpawnButton(btn)
+	if not btn then return false end
+
+	if firesignal then
+		firesignal(btn.MouseButton1Click)
+		fixAfterAutoSpawn()
+		return true
+	end
+
+	if getconnections then
+		for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
+			c:Fire()
+		end
+		fixAfterAutoSpawn()
+		return true
+	end
+
+	warn("[PennyHub] Executor không hỗ trợ firesignal/getconnections cho Auto Spawn.")
+	return false
+end
+
+local function unlockAutoSpawnWhenUIReady()
+	task.spawn(function()
+		autoSpawnClickedLock = true
+
+		task.wait(getAutoSpawnRespawnDelay())
+
+		while Config.AutoSpawn and (findSpawnButton() == nil or not isLoadFrameVisible()) do
+			task.wait(0.2)
+		end
+
+		if not Config.AutoSpawn then return end
+
+		task.wait(getAutoSpawnUIStable())
+		autoSpawnClickedLock = false
+	end)
+end
+
+local function hookAutoSpawnDeath(char)
+	if not char or autoSpawnHookedChars[char] then return end
+	autoSpawnHookedChars[char] = true
+
+	task.spawn(function()
+		local hum = char:WaitForChild("Humanoid", 10)
+		if hum then
+			hum.Died:Connect(function()
+				if Config.AutoSpawn then
+					unlockAutoSpawnWhenUIReady()
+				end
+			end)
+		end
+	end)
+end
+
+local function runAutoSpawn()
+	if autoSpawnRunning then return end
+	autoSpawnRunning = true
+	autoSpawnClickedLock = true
+
+	if player.Character then
+		hookAutoSpawnDeath(player.Character)
+	end
+
+	task.delay(2, function()
+		if Config.AutoSpawn then
+			autoSpawnClickedLock = false
+		end
+	end)
+
+	task.spawn(function()
+		while Config.AutoSpawn do
+			task.wait(tonumber(CHECK_DELAY) or 0.5)
+
+			local btn = findSpawnButton()
+			local loadVisible = isLoadFrameVisible()
+
+			if btn and loadVisible and not autoSpawnClickedLock then
+				autoSpawnClickedLock = true
+
+				local ok = clickAutoSpawnButton(btn)
+				if not ok then
+					autoSpawnClickedLock = false
+				end
+			end
+		end
+
+		autoSpawnRunning = false
+		autoSpawnClickedLock = true
+	end)
+end
+
+player.CharacterAdded:Connect(function(char)
+	hookAutoSpawnDeath(char)
+end)
+
 --// BUILD TABS
 local mainTab = createTab("Main", 0)
 local farmingTab = createTab("Farming", 1)
 local settingTab = createTab("Setting", 2)
 
 -- Main
-local mainCard = card(mainTab, "Main", 20, 20, 560, 210)
+local mainCard = card(mainTab, "Main", 20, 20, 560, 360)
 label(mainCard, "Penny Hub Max UI", 20, 45, 300, 24)
 label(mainCard, "RightShift hoặc Left Alt để ẩn/hiện menu. Khi menu tắt, nút OPEN HUB sẽ hiện bên ngoài.", 20, 75, 500, 24)
 label(mainCard, "Các tab có thể cuộn chuột hoặc vuốt xuống để xem thêm.", 20, 105, 500, 24)
@@ -1748,6 +2044,62 @@ textbox(mainCard, "300", 100, 136, 100, 30,
 	end,
 	false
 )
+
+
+toggle(mainCard, "AutoSpawn", "Auto Spawn", 20, 185, 240, 34, function(state)
+	if state then
+		runAutoSpawn()
+	else
+		autoSpawnClickedLock = true
+	end
+end)
+
+label(mainCard, "Respawn Delay", 20, 230, 120, 24)
+textbox(mainCard, "3.5", 135, 226, 80, 30,
+	function()
+		return tostring(Config.AutoSpawnRespawnDelay or 3.5)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.AutoSpawnRespawnDelay = math.clamp(n, 0.5, 15)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(mainCard, "UI Stable Wait", 20, 270, 120, 24)
+textbox(mainCard, "1", 135, 266, 80, 30,
+	function()
+		return tostring(Config.AutoSpawnUIStable or 1)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.AutoSpawnUIStable = math.clamp(n, 0, 10)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(mainCard, "Script Delay", 20, 310, 120, 24)
+textbox(mainCard, "4", 135, 306, 80, 30,
+	function()
+		return tostring(Config.AutoSpawnScriptDelay or 4)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.AutoSpawnScriptDelay = math.clamp(n, 0, 15)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(mainCard, "Script Delay: thời gian chờ sau khi spawn rồi mới cho AFK/Fly/Drop hoạt động.", 20, 350, 520, 24)
 
 -- Farming
 local farmCard = card(farmingTab, "Farming", 20, 20, 560, 230)
@@ -2057,6 +2409,10 @@ button(configCard, "Load Selected", 15, 400, 85, 32, function()
 		if Config.AutoDropSam then
 			runAutoDropSam()
 		end
+
+		if Config.AutoSpawn then
+			runAutoSpawn()
+		end
 	end
 end)
 
@@ -2100,6 +2456,10 @@ end
 
 if Config.AutoDropSam then
 	runAutoDropSam()
+end
+
+if Config.AutoSpawn then
+	runAutoSpawn()
 end
 
 forceTopLayer(gui)
