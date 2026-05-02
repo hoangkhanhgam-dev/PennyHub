@@ -32,6 +32,8 @@ local Config = {
 	AutoDropSam = false,
 	AutoGemGiftBox = false,
 	AutoBeriGiftBox = false,
+	AutoWoodRodQuest = false,
+	WoodRodTPDelay = 2,
 	GiftBoxDelay = 2.5,
 	FlySpeed = 300,
 
@@ -285,6 +287,8 @@ do
 		Config.AutoDropSam = false
 		Config.AutoGemGiftBox = false
 		Config.AutoBeriGiftBox = false
+		Config.AutoWoodRodQuest = false
+		Config.WoodRodTPDelay = tonumber(Config.WoodRodTPDelay) or 2
 		Config.GiftBoxDelay = tonumber(Config.GiftBoxDelay) or 2.5
 		Config.FlySpeed = tonumber(Config.FlySpeed) or 300
 		Config.DropPinEnabled = Config.DropPinEnabled ~= false
@@ -2038,6 +2042,239 @@ local function runAutoBeriGiftBox()
 end
 
 
+--// AUTO WOOD ROD QUEST LOGIC
+local autoWoodRodQuestRunning = false
+local woodRodCachedNpcName = nil
+
+local function getWoodRodTPDelay()
+	return math.clamp(tonumber(Config.WoodRodTPDelay) or 2, 0.2, 10)
+end
+
+local function findWoodRodTool()
+	local char = player.Character
+	local backpack = player:FindFirstChild("Backpack")
+	return (char and char:FindFirstChild("Wood Rod")) or (backpack and backpack:FindFirstChild("Wood Rod"))
+end
+
+local function equipAnyTool(tool)
+	if not tool then return false end
+	local char, hrp, hum = getChar()
+	if not char or not hum then return false end
+	if tool.Parent ~= char then
+		hum:EquipTool(tool)
+		task.wait(0.25)
+	end
+	return true
+end
+
+local function tryUpdateWoodRod()
+	pcall(function()
+		game:GetService("ReplicatedStorage")
+			:WaitForChild("Connections")
+			:WaitForChild("UpdateWeapon")
+			:FireServer("Wood Rod")
+	end)
+
+	task.wait(0.5)
+
+	local rod = findWoodRodTool()
+	if rod then
+		print("[PennyHub] Wood Rod found. Equipping and stopping Auto Wood Rod Quest.")
+		equipAnyTool(rod)
+		Config.AutoWoodRodQuest = false
+		saveIndexConfig()
+		if refreshers.AutoWoodRodQuest then
+			pcall(refreshers.AutoWoodRodQuest)
+		end
+		return true
+	end
+
+	return false
+end
+
+local function getPackageTool()
+	local char = player.Character
+	local backpack = player:FindFirstChild("Backpack")
+	return (char and char:FindFirstChild("Package")) or (backpack and backpack:FindFirstChild("Package"))
+end
+
+local function equipPackageTool()
+	local pkg = getPackageTool()
+	if not pkg then return nil end
+	equipAnyTool(pkg)
+	return getPackageTool()
+end
+
+local function woodRodTp(pos)
+	local char, hrp = getChar()
+	if not char or not hrp then return false end
+	hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+	hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+	hrp.CFrame = CFrame.new(pos)
+	task.wait(getWoodRodTPDelay())
+	return true
+end
+
+local function getWoodRodNpcPart(npc)
+	if not npc then return nil end
+	if npc:IsA("BasePart") then return npc end
+	return npc:FindFirstChild("HumanoidRootPart")
+		or npc:FindFirstChild("Head")
+		or npc.PrimaryPart
+		or npc:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getWoodRodTouchPos(part)
+	local char, hrp = getChar()
+	if not hrp or not part then return nil end
+
+	local dir = hrp.Position - part.Position
+	if dir.Magnitude < 0.1 then
+		dir = part.CFrame.LookVector
+	else
+		dir = dir.Unit
+	end
+
+	return part.Position + dir * 0.8
+end
+
+local function pinWoodRodToNpc(part, duration)
+	local char, hrp = getChar()
+	if not hrp or not part then return end
+
+	local start = tick()
+	while Config.AutoWoodRodQuest and tick() - start < duration do
+		local pos = getWoodRodTouchPos(part)
+		if not pos then break end
+		hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+		hrp.CFrame = CFrame.lookAt(pos, part.Position)
+		task.wait()
+	end
+end
+
+local function getWoodRodQuest()
+	local npc = workspace:WaitForChild("Merchants"):WaitForChild("QuestFishMerchant")
+	local part = getWoodRodNpcPart(npc)
+	if part then
+		woodRodTp(part.Position + Vector3.new(0, 3, 5))
+	end
+
+	local remote = npc:WaitForChild("Clickable"):WaitForChild("Retum")
+	remote:FireServer("Package")
+	task.wait(0.3)
+	remote:FireServer("Close")
+end
+
+local function tryDeliverWoodRodPackageToNpc(npc)
+	local part = getWoodRodNpcPart(npc)
+	if not part then return false end
+
+	print("[PennyHub] Auto Wood Rod Quest trying NPC:", npc.Name)
+
+	local touchPos = getWoodRodTouchPos(part)
+	if not touchPos then return false end
+	woodRodTp(touchPos)
+	pinWoodRodToNpc(part, 0.5)
+
+	for i = 1, 5 do
+		if not Config.AutoWoodRodQuest then return false end
+
+		local pkg = equipPackageTool()
+		if not pkg then
+			print("[PennyHub] Package delivered at:", npc.Name)
+			woodRodCachedNpcName = npc.Name
+			return true
+		end
+
+		pcall(function()
+			pkg:Activate()
+		end)
+
+		pinWoodRodToNpc(part, 0.15)
+		task.wait(0.15)
+
+		if not getPackageTool() then
+			print("[PennyHub] Package delivered at:", npc.Name)
+			woodRodCachedNpcName = npc.Name
+			return true
+		end
+	end
+
+	return false
+end
+
+local function getWoodRodNpcList()
+	local merchants = workspace:FindFirstChild("Merchants")
+	if not merchants then return {} end
+
+	local list = {}
+
+	if woodRodCachedNpcName then
+		local cached = merchants:FindFirstChild(woodRodCachedNpcName)
+		if cached and cached:IsA("Model") then
+			table.insert(list, cached)
+		end
+	end
+
+	for _, npc in ipairs(merchants:GetChildren()) do
+		if npc:IsA("Model") and npc.Name ~= "QuestFishMerchant" and npc.Name ~= woodRodCachedNpcName then
+			table.insert(list, npc)
+		end
+	end
+
+	return list
+end
+
+local function deliverWoodRodPackageByScan()
+	for _, npc in ipairs(getWoodRodNpcList()) do
+		if not Config.AutoWoodRodQuest then return false end
+		if not getPackageTool() then return true end
+		if tryDeliverWoodRodPackageToNpc(npc) then
+			return true
+		end
+		task.wait(0.1)
+	end
+
+	woodRodCachedNpcName = nil
+	return not getPackageTool()
+end
+
+local function runAutoWoodRodQuest()
+	if autoWoodRodQuestRunning then return end
+	autoWoodRodQuestRunning = true
+
+	task.spawn(function()
+		while Config.AutoWoodRodQuest do
+			local ok, err = pcall(function()
+				if not isCharacterReady() then
+					task.wait(0.5)
+					return
+				end
+
+				if tryUpdateWoodRod() then
+					return
+				end
+
+				if not getPackageTool() then
+					getWoodRodQuest()
+				else
+					deliverWoodRodPackageByScan()
+				end
+			end)
+
+			if not ok then
+				warn("[PennyHub] Auto Wood Rod Quest error:", err)
+			end
+
+			task.wait(1)
+		end
+
+		autoWoodRodQuestRunning = false
+	end)
+end
+
+
 --// AUTO SPAWN LOGIC
 local autoSpawnRunning = false
 local autoSpawnClickedLock = true
@@ -2321,8 +2558,8 @@ textbox(mainCard, "2.5", 100, 451, 80, 30,
 )
 
 -- Farming
-local farmCard = card(farmingTab, "Farming", 20, 20, 560, 230)
-toggle(farmCard, "AfkArenaAuto", "Afk Arena Auto", 20, 50, 240, 34, function(state)
+local farmCard = card(farmingTab, "Farming", 20, 20, 560, 300)
+toggle(farmCard, "AfkArenaAuto", "Auto AFK Arena", 20, 50, 240, 34, function(state)
 	if state then
 		startAfk()
 	else
@@ -2364,7 +2601,28 @@ textbox(farmCard, "3", 405, 131, 80, 30,
 	false
 )
 
-label(farmCard, "Auto Get: bay tới NPC và claim. Auto Drop Sam: drop Compass/Silver/Golden.", 20, 175, 500, 24)
+toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 175, 240, 34, function(state)
+	if state then
+		runAutoWoodRodQuest()
+	end
+end)
+
+label(farmCard, "Wood Rod TP Delay", 290, 178, 120, 24)
+textbox(farmCard, "2", 415, 174, 80, 30,
+	function()
+		return tostring(Config.WoodRodTPDelay or 2)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.WoodRodTPDelay = math.clamp(n, 0.2, 10)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(farmCard, "Auto Wood Rod: nhận/giao Package, check Wood Rod rồi equip và tự tắt.", 20, 220, 520, 24)
 
 -- Setting: Webhook
 local webhookCard = card(settingTab, "Webhook", 20, 20, 360, 455)
@@ -2658,6 +2916,10 @@ button(configCard, "Load Selected", 15, 400, 85, 32, function()
 		if Config.AutoBeriGiftBox then
 			runAutoBeriGiftBox()
 		end
+
+		if Config.AutoWoodRodQuest then
+			runAutoWoodRodQuest()
+		end
 	end
 end)
 
@@ -2713,6 +2975,10 @@ end
 
 if Config.AutoBeriGiftBox then
 	runAutoBeriGiftBox()
+end
+
+if Config.AutoWoodRodQuest then
+	runAutoWoodRodQuest()
 end
 
 forceTopLayer(gui)
