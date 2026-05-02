@@ -32,6 +32,10 @@ local Config = {
 	AutoDropSam = false,
 	FlySpeed = 300,
 
+	DropPinEnabled = true,
+	DropNoClip = true,
+	DropPinOffsetY = 3,
+
 	AutoSpawn = false,
 	AutoSpawnRespawnDelay = 3.5,
 	AutoSpawnUIStable = 1,
@@ -277,6 +281,9 @@ do
 		Config.AutoGetAfkReward = false
 		Config.AutoDropSam = false
 		Config.FlySpeed = tonumber(Config.FlySpeed) or 300
+		Config.DropPinEnabled = Config.DropPinEnabled ~= false
+		Config.DropNoClip = Config.DropNoClip ~= false
+		Config.DropPinOffsetY = tonumber(Config.DropPinOffsetY) or 3
 		Config.AutoSpawn = false
 		Config.AutoSpawnRespawnDelay = tonumber(Config.AutoSpawnRespawnDelay) or 3.5
 		Config.AutoSpawnUIStable = tonumber(Config.AutoSpawnUIStable) or 1
@@ -1511,6 +1518,104 @@ local function forceStopFloat()
 	floatActive = false
 end
 
+
+--// DROP PIN + NOCLIP
+-- Giữ nhân vật đứng yên đúng điểm drop, hạn chế bị player khác đẩy ra chỗ quái.
+local dropPinConn = nil
+local dropNoClipBackup = {}
+
+local function setDropNoClip(enabled)
+	local char = player.Character
+	if not char then return end
+
+	for _, part in ipairs(char:GetDescendants()) do
+		if part:IsA("BasePart") then
+			if enabled then
+				if dropNoClipBackup[part] == nil then
+					dropNoClipBackup[part] = part.CanCollide
+				end
+				part.CanCollide = false
+			else
+				if dropNoClipBackup[part] ~= nil then
+					part.CanCollide = dropNoClipBackup[part]
+				end
+			end
+		end
+	end
+
+	if not enabled then
+		dropNoClipBackup = {}
+	end
+end
+
+local function stopDropPin()
+	if dropPinConn then
+		dropPinConn:Disconnect()
+		dropPinConn = nil
+	end
+
+	setDropNoClip(false)
+end
+
+local function startDropPin(pinPos, token)
+	if not Config.DropPinEnabled then return end
+
+	stopDropPin()
+
+	local char, hrp, hum = getChar()
+	if not char or not hrp or not hum then return end
+
+	if Config.DropNoClip then
+		setDropNoClip(true)
+	end
+
+	hum.PlatformStand = true
+	hum.Sit = false
+	hum.AutoRotate = false
+
+	if floatBV then
+		floatBV.Velocity = Vector3.new(0, 0, 0)
+		floatBV.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+	end
+
+	if floatBG then
+		floatBG.CFrame = CFrame.new(pinPos)
+	end
+
+	dropPinConn = RunService.Heartbeat:Connect(function()
+		if token ~= actionToken or not Config.AutoDropSam or not isCharacterReady() then
+			stopDropPin()
+			return
+		end
+
+		local c = player.Character
+		local root = c and c:FindFirstChild("HumanoidRootPart")
+		local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+		if not root or not humanoid then return end
+
+		if Config.DropNoClip then
+			setDropNoClip(true)
+		end
+
+		humanoid.PlatformStand = true
+		humanoid.Sit = false
+		humanoid.AutoRotate = false
+
+		root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+		root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+		root.CFrame = CFrame.new(pinPos)
+
+		if floatBV then
+			floatBV.Velocity = Vector3.new(0, 0, 0)
+		end
+
+		if floatBG then
+			floatBG.CFrame = root.CFrame
+		end
+	end)
+end
+
+
 local function stopFloatIfIdle()
 	if Config.AutoGetAfkReward or Config.AutoDropSam then return end
 	if floatActive or floatBV or floatBG then
@@ -1520,6 +1625,7 @@ end
 
 local function cancelCurrentAutoMove()
 	actionToken += 1
+	stopDropPin()
 	if not Config.AutoGetAfkReward and not Config.AutoDropSam then
 		actionBusy = false
 		forceStopFloat()
@@ -1532,6 +1638,7 @@ task.spawn(function()
 			stopFloatIfIdle()
 		else
 			if not isCharacterReady() then
+				stopDropPin()
 				forceStopFloat()
 				task.wait()
 				continue
@@ -1696,14 +1803,22 @@ end
 local function dropAll(typeName, pos, token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoDropSam then return end
+
 	local tools = getTools(typeName)
 	if #tools == 0 then
 		print("[PennyHub] Không có:", typeName)
 		return
 	end
 
+	local offsetY = tonumber(Config.DropPinOffsetY) or 3
+	local dropPos = pos + Vector3.new(0, offsetY, 0)
+
 	print("[PennyHub] Dropping:", typeName)
-	if not flyTo(pos + Vector3.new(0, 3, 0), token) then return end
+	if not flyTo(dropPos, token) then return end
+
+	-- Vừa tới điểm drop thì ghim cứng ở đúng vị trí này.
+	-- Điều này giúp hạn chế bị nhiều tài khoản/player khác đẩy ra khỏi điểm drop.
+	startDropPin(dropPos, token)
 
 	while Config.AutoDropSam and token == actionToken do
 		local current = getTools(typeName)
@@ -1714,11 +1829,24 @@ local function dropAll(typeName, pos, token)
 
 		for _, tool in ipairs(current) do
 			if token ~= actionToken or not Config.AutoDropSam then break end
+
+			-- Re-pin trước mỗi lần drop để không bị lệch vị trí do va chạm/player khác.
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+				hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+				hrp.CFrame = CFrame.new(dropPos)
+			end
+
 			dropTool(tool)
+			task.wait(0.08)
 		end
 
 		task.wait(0.05)
 	end
+
+	stopDropPin()
 end
 
 local function doGetAfkRewardOnce(token)
@@ -2126,6 +2254,24 @@ toggle(farmCard, "AutoDropSam", "Auto Drop Sam (Compass)", 20, 130, 240, 34, fun
 		cancelCurrentAutoMove()
 	end
 end)
+
+toggle(farmCard, "DropPinEnabled", "Pin Position Khi Drop", 290, 50, 240, 34)
+toggle(farmCard, "DropNoClip", "NoClip Khi Drop", 290, 90, 240, 34)
+
+label(farmCard, "Drop Offset Y", 290, 135, 120, 24)
+textbox(farmCard, "3", 405, 131, 80, 30,
+	function()
+		return tostring(Config.DropPinOffsetY or 3)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropPinOffsetY = math.clamp(n, 0, 10)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
 
 label(farmCard, "Auto Get: bay tới NPC và claim. Auto Drop Sam: drop Compass/Silver/Golden.", 20, 175, 500, 24)
 
