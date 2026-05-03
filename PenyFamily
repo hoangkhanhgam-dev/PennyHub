@@ -46,6 +46,7 @@ local Config = {
 	AutoSpawnRespawnDelay = 3.5,
 	AutoSpawnUIStable = 1,
 	AutoSpawnScriptDelay = 4,
+	HubStartDelay = 8,
 
 	WebhookEnabled = false,
 	WebhookURL = "",
@@ -123,6 +124,26 @@ local function safeDecode(raw)
 		return result
 	end
 	return nil
+end
+
+
+local function parseInfiniteDelay(value, defaultValue)
+	local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+
+	if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
+		return math.huge
+	end
+
+	local n = tonumber(value)
+	if not n then
+		return defaultValue
+	end
+
+	if n < 0 then
+		return 0
+	end
+
+	return n
 end
 
 local function applyTableToConfig(data)
@@ -297,9 +318,10 @@ do
 		Config.DropNoClip = Config.DropNoClip ~= false
 		Config.DropPinOffsetY = tonumber(Config.DropPinOffsetY) or 3
 		Config.AutoSpawn = false
-		Config.AutoSpawnRespawnDelay = tonumber(Config.AutoSpawnRespawnDelay) or 3.5
-		Config.AutoSpawnUIStable = tonumber(Config.AutoSpawnUIStable) or 1
-		Config.AutoSpawnScriptDelay = tonumber(Config.AutoSpawnScriptDelay) or 4
+		Config.AutoSpawnRespawnDelay = Config.AutoSpawnRespawnDelay or 3.5
+		Config.AutoSpawnUIStable = Config.AutoSpawnUIStable or 1
+		Config.AutoSpawnScriptDelay = Config.AutoSpawnScriptDelay or 4
+		Config.HubStartDelay = Config.HubStartDelay or 8
 		Config.WebhookEnabled = false
 		Config.WebhookURL = ""
 		Config.DiscordID = ""
@@ -1362,7 +1384,7 @@ end
 local characterReadyAt = 0
 
 local function getAutoSpawnScriptDelay()
-	return math.clamp(tonumber(Config.AutoSpawnScriptDelay) or 4, 0, 15)
+	return parseInfiniteDelay(Config.AutoSpawnScriptDelay, 4)
 end
 
 local function markCharacterNotReady()
@@ -2412,11 +2434,11 @@ local autoSpawnClickedLock = true
 local autoSpawnHookedChars = {}
 
 local function getAutoSpawnRespawnDelay()
-	return math.clamp(tonumber(Config.AutoSpawnRespawnDelay) or 3.5, 0.5, 15)
+	return parseInfiniteDelay(Config.AutoSpawnRespawnDelay, 3.5)
 end
 
 local function getAutoSpawnUIStable()
-	return math.clamp(tonumber(Config.AutoSpawnUIStable) or 1, 0, 10)
+	return parseInfiniteDelay(Config.AutoSpawnUIStable, 1)
 end
 
 local function findSpawnButton()
@@ -2619,9 +2641,15 @@ textbox(mainCard, "3.5", 135, 226, 80, 30,
 		return tostring(Config.AutoSpawnRespawnDelay or 3.5)
 	end,
 	function(value)
+		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
+			Config.AutoSpawnRespawnDelay = "inf"
+			saveIndexConfig()
+			return
+		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnRespawnDelay = math.clamp(n, 0.5, 15)
+			Config.AutoSpawnRespawnDelay = math.max(n, 0)
 			saveIndexConfig()
 		end
 	end,
@@ -2634,9 +2662,15 @@ textbox(mainCard, "1", 135, 266, 80, 30,
 		return tostring(Config.AutoSpawnUIStable or 1)
 	end,
 	function(value)
+		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
+			Config.AutoSpawnUIStable = "inf"
+			saveIndexConfig()
+			return
+		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnUIStable = math.clamp(n, 0, 10)
+			Config.AutoSpawnUIStable = math.max(n, 0)
 			saveIndexConfig()
 		end
 	end,
@@ -2649,9 +2683,15 @@ textbox(mainCard, "4", 135, 306, 80, 30,
 		return tostring(Config.AutoSpawnScriptDelay or 4)
 	end,
 	function(value)
+		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
+			Config.AutoSpawnScriptDelay = "inf"
+			saveIndexConfig()
+			return
+		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnScriptDelay = math.clamp(n, 0, 15)
+			Config.AutoSpawnScriptDelay = math.max(n, 0)
 			saveIndexConfig()
 		end
 	end,
@@ -2659,6 +2699,29 @@ textbox(mainCard, "4", 135, 306, 80, 30,
 )
 
 label(mainCard, "Script Delay: thời gian chờ sau khi spawn rồi mới cho AFK/Fly/Drop hoạt động.", 20, 350, 520, 24)
+
+label(mainCard, "Hub Start Delay", 260, 230, 120, 24)
+textbox(mainCard, "8", 375, 226, 80, 30,
+	function()
+		return tostring(Config.HubStartDelay or 8)
+	end,
+	function(value)
+		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
+			Config.HubStartDelay = "inf"
+			saveIndexConfig()
+			return
+		end
+		local n = tonumber(value)
+		if n then
+			Config.HubStartDelay = math.max(n, 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(mainCard, "Nhập số lớn hoặc inf để delay vô hạn.", 260, 270, 260, 24)
 
 label(mainCard, "Gift Box Auto", 20, 385, 160, 24)
 toggle(mainCard, "AutoGemGiftBox", "Gem Gift Box", 20, 415, 240, 34, function(state)
