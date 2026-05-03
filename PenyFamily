@@ -67,6 +67,9 @@ local Config = {
 	AfkArenaAuto = false,
 	AutoGetAfkReward = false,
 	AutoDropSam = false,
+	AutoPickCompass = false,
+	AutoPickCompassSpeed = 250,
+	AutoPickCompassDelay = 0.25,
 	AutoDropCompassAmount = false,
 	DropCompassAmount = 0,
 	DropSilverCompassAmount = 0,
@@ -347,6 +350,9 @@ do
 		Config.AfkArenaAuto = false
 		Config.AutoGetAfkReward = false
 		Config.AutoDropSam = false
+		Config.AutoPickCompass = false
+		Config.AutoPickCompassSpeed = tonumber(Config.AutoPickCompassSpeed) or 250
+		Config.AutoPickCompassDelay = tonumber(Config.AutoPickCompassDelay) or 0.25
 		Config.AutoDropCompassAmount = false
 		Config.DropCompassAmount = tonumber(Config.DropCompassAmount) or 0
 		Config.DropSilverCompassAmount = tonumber(Config.DropSilverCompassAmount) or 0
@@ -1421,6 +1427,7 @@ local DROP_POSITIONS = {
 
 local autoRewardRunning = false
 local autoDropRunning = false
+local autoPickCompassRunning = false
 local autoDropAmountRunning = false
 local autoDropDrinkRunning = false
 local autoBuyDrinkRunning = false
@@ -1716,7 +1723,7 @@ end
 
 
 local function stopFloatIfIdle()
-	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoUseDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
+	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoPickCompass or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoUseDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
 	if floatActive or floatBV or floatBG then
 		forceStopFloat()
 	end
@@ -1725,7 +1732,7 @@ end
 local function cancelCurrentAutoMove()
 	actionToken += 1
 	stopDropPin()
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoPickCompass and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		actionBusy = false
 		forceStopFloat()
 	end
@@ -1733,7 +1740,7 @@ end
 
 task.spawn(function()
 	while gui.Parent do
-		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoPickCompass and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 			stopFloatIfIdle()
 		else
 			if not isCharacterReady() then
@@ -1763,7 +1770,7 @@ local function flyTo(pos, token)
 		return false
 	end
 
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoPickCompass and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		forceStopFloat()
 		return false
 	end
@@ -1785,7 +1792,7 @@ local function flyTo(pos, token)
 	tween:Play()
 
 	while tween.PlaybackState == Enum.PlaybackState.Playing do
-		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards) then
+		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoPickCompass and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards) then
 			tween:Cancel()
 			forceStopFloat()
 			return false
@@ -2002,6 +2009,173 @@ local function doDropSamOnce(token)
 	dropAll("GoldenCompass", DROP_POSITIONS.GoldenCompass, token)
 end
 
+
+
+
+
+--// AUTO PICK COMPASS SERVER
+-- Tự tìm object có CompassServer trong workspace:GetChildren(), ưu tiên cái gần nhất rồi tween tới nhặt.
+local function getAutoPickCompassSpeed()
+	local n = tonumber(Config.AutoPickCompassSpeed) or 250
+	return math.clamp(n, 50, 1500)
+end
+
+local function getAutoPickCompassDelay()
+	local n = tonumber(Config.AutoPickCompassDelay) or 0.25
+	return math.clamp(n, 0.05, 3)
+end
+
+local function getCompassServerPart(obj)
+	if not obj then return nil end
+
+	local compassServer = obj:FindFirstChild("CompassServer")
+	if not compassServer then return nil end
+
+	if compassServer:IsA("BasePart") then
+		return compassServer
+	end
+
+	local part = compassServer:FindFirstChildWhichIsA("BasePart", true)
+	if part then return part end
+
+	if obj:IsA("BasePart") then
+		return obj
+	end
+
+	return obj:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function findNearestCompassServer()
+	local char, hrp = getChar()
+	if not char or not hrp then return nil, nil, nil end
+
+	local nearestObj = nil
+	local nearestPart = nil
+	local nearestDist = math.huge
+
+	for _, obj in ipairs(workspace:GetChildren()) do
+		local part = getCompassServerPart(obj)
+
+		if part and part.Parent then
+			local dist = (hrp.Position - part.Position).Magnitude
+
+			if dist < nearestDist then
+				nearestObj = obj
+				nearestPart = part
+				nearestDist = dist
+			end
+		end
+	end
+
+	return nearestObj, nearestPart, nearestDist
+end
+
+local function tweenToCompassPart(part, token)
+	token = token or actionToken
+
+	if not isCharacterReady() then return false end
+	if not part or not part.Parent then return false end
+	if not startFloat() then return false end
+
+	local char, hrp = getChar()
+	if not char or not hrp then return false end
+
+	local pos = part.Position + Vector3.new(0, 2.5, 0)
+	local dist = (hrp.Position - pos).Magnitude
+	local speed = getAutoPickCompassSpeed()
+	local time = math.max(dist / speed, 0.08)
+
+	local tween = TweenService:Create(
+		hrp,
+		TweenInfo.new(time, Enum.EasingStyle.Linear),
+		{ CFrame = CFrame.new(pos) }
+	)
+
+	tween:Play()
+
+	while tween.PlaybackState == Enum.PlaybackState.Playing do
+		if token ~= actionToken or not Config.AutoPickCompass or not isCharacterReady() then
+			tween:Cancel()
+			return false
+		end
+
+		task.wait()
+	end
+
+	return true
+end
+
+local function pickCompassServer(obj, part)
+	local char, hrp = getChar()
+	if not char or not hrp or not part then return end
+
+	pcall(function()
+		firetouchinterest(hrp, part, 0)
+		task.wait(0.05)
+		firetouchinterest(hrp, part, 1)
+	end)
+
+	local prompt = obj and obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+	if prompt and fireproximityprompt then
+		pcall(function()
+			fireproximityprompt(prompt)
+		end)
+	end
+
+	local click = obj and obj:FindFirstChildWhichIsA("ClickDetector", true)
+	if click and fireclickdetector then
+		pcall(function()
+			fireclickdetector(click)
+		end)
+	end
+end
+
+local function runAutoPickCompass()
+	if autoPickCompassRunning then return end
+	autoPickCompassRunning = true
+
+	task.spawn(function()
+		while Config.AutoPickCompass do
+			if Config.AutoWoodRodQuest then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
+			if not isCharacterReady() then
+				task.wait(0.5)
+				continue
+			end
+
+			local myToken = actionToken
+			waitActionFree()
+
+			local ok, err = pcall(function()
+				local obj, part, dist = findNearestCompassServer()
+
+				if obj and part then
+					print("[PennyHub] Auto Pick CompassServer:", obj.Name, "Dist:", math.floor(dist))
+
+					if tweenToCompassPart(part, myToken) then
+						task.wait(0.05)
+						pickCompassServer(obj, part)
+					end
+				end
+			end)
+
+			releaseAction()
+
+			if not ok then
+				warn("[PennyHub] Auto Pick Compass error:", err)
+			end
+
+			task.wait(getAutoPickCompassDelay())
+		end
+
+		autoPickCompassRunning = false
+		stopFloatIfIdle()
+	end)
+end
 
 
 --// AUTO DROP COMPASS BY AMOUNT
@@ -3835,6 +4009,52 @@ textbox(dropFixedCard, "3", 145, 131, 80, 30,
 )
 
 label(dropFixedCard, "Chỉ áp dụng Auto Drop Sam cố định.", 20, 165, 230, 24)
+
+
+
+pickCompassCard = card(farmingTab, "Auto Pick Compass", 20, 370, 560, 210)
+
+toggle(pickCompassCard, "AutoPickCompass", "Auto Pick CompassServer", 20, 50, 240, 34, function(state)
+	if state then
+		runAutoPickCompass()
+	else
+		cancelCurrentAutoMove()
+	end
+end)
+
+label(pickCompassCard, "Pick Speed", 300, 50, 100, 24)
+textbox(pickCompassCard, "250", 400, 46, 80, 30,
+	function()
+		return tostring(Config.AutoPickCompassSpeed or 250)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.AutoPickCompassSpeed = math.clamp(n, 50, 1500)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(pickCompassCard, "Pick Delay", 300, 90, 100, 24)
+textbox(pickCompassCard, "0.25", 400, 86, 80, 30,
+	function()
+		return tostring(Config.AutoPickCompassDelay or 0.25)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.AutoPickCompassDelay = math.clamp(n, 0.05, 3)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(pickCompassCard, "Tự tìm CompassServer gần nhất trong workspace rồi tween tới nhặt.", 20, 105, 500, 24)
+label(pickCompassCard, "Không cần nhập index [98] [105], vì index có thể đổi.", 20, 130, 500, 24)
+label(pickCompassCard, "Card này đã tách riêng để không bị lấn UI.", 20, 155, 500, 24)
 
 
 -- Setting: Webhook
