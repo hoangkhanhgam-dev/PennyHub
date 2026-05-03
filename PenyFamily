@@ -1,3 +1,40 @@
+--// PENNY HUB START DELAY / ANTI NIL
+-- Chống auto executor chạy quá sớm khi vừa vào game.
+if getgenv().PennyHubStartDelayLoaded then
+	return
+end
+getgenv().PennyHubStartDelayLoaded = true
+
+task.wait(5)
+
+repeat task.wait() until game:IsLoaded()
+
+local __pennyPlayers = game:GetService("Players")
+local __pennyLocalPlayer = __pennyPlayers.LocalPlayer
+
+repeat task.wait() until __pennyLocalPlayer
+repeat task.wait() until __pennyLocalPlayer:FindFirstChild("PlayerGui")
+repeat task.wait() until workspace
+
+-- Không bắt buộc Character phải spawn trước, vì hub có Auto Spawn riêng.
+-- Nhưng nếu Character đã tồn tại thì đợi HRP/Humanoid ổn định thêm chút.
+if __pennyLocalPlayer.Character then
+	local __char = __pennyLocalPlayer.Character
+	local __hum = __char:FindFirstChildOfClass("Humanoid")
+	local __hrp = __char:FindFirstChild("HumanoidRootPart")
+	if not (__hum and __hrp) then
+		pcall(function()
+			__char:WaitForChild("HumanoidRootPart", 8)
+			__char:WaitForChild("Humanoid", 8)
+		end)
+	end
+end
+
+task.wait(1)
+
+print("[PennyHub] Start delay done -> loading hub")
+
+
 --// PENNY HUB - MAX LEVEL UI + AUTO SPAWN + AFK ARENA + WEBHOOK + CONFIG MANAGER
 --// Full script đã gộp UI kính mờ + scroll từng danh mục + webhook chỉnh được + config tạo/lưu/load trong workspace
 --// Phím ẩn/hiện menu: RightShift
@@ -47,6 +84,13 @@ local Config = {
 	BuyJuiceAmount = 0,
 	BuySmoothieAmount = 0,
 	BuyDrinkDelay = 0.15,
+
+	AutoUseDrinkAmount = false,
+	UseCiderAmount = 0,
+	UseLemonadeAmount = 0,
+	UseJuiceAmount = 0,
+	UseSmoothieAmount = 0,
+	UseDrinkDelay = 0.15,
 	AutoChangeNoAfkRewards = false,
 	AutoGemGiftBox = false,
 	AutoBeriGiftBox = false,
@@ -318,6 +362,12 @@ do
 		Config.BuyJuiceAmount = tonumber(Config.BuyJuiceAmount) or 0
 		Config.BuySmoothieAmount = tonumber(Config.BuySmoothieAmount) or 0
 		Config.BuyDrinkDelay = tonumber(Config.BuyDrinkDelay) or 0.15
+		Config.AutoUseDrinkAmount = false
+		Config.UseCiderAmount = tonumber(Config.UseCiderAmount) or 0
+		Config.UseLemonadeAmount = tonumber(Config.UseLemonadeAmount) or 0
+		Config.UseJuiceAmount = tonumber(Config.UseJuiceAmount) or 0
+		Config.UseSmoothieAmount = tonumber(Config.UseSmoothieAmount) or 0
+		Config.UseDrinkDelay = tonumber(Config.UseDrinkDelay) or 0.15
 		Config.AutoChangeNoAfkRewards = false
 		Config.AutoGemGiftBox = false
 		Config.AutoBeriGiftBox = false
@@ -1374,6 +1424,7 @@ local autoDropRunning = false
 local autoDropAmountRunning = false
 local autoDropDrinkRunning = false
 local autoBuyDrinkRunning = false
+local autoUseDrinkRunning = false
 local autoChangeNoAfkRewardsRunning = false
 local floatBV, floatBG
 local floatActive = false
@@ -1665,7 +1716,7 @@ end
 
 
 local function stopFloatIfIdle()
-	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
+	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoUseDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
 	if floatActive or floatBV or floatBG then
 		forceStopFloat()
 	end
@@ -1674,7 +1725,7 @@ end
 local function cancelCurrentAutoMove()
 	actionToken += 1
 	stopDropPin()
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		actionBusy = false
 		forceStopFloat()
 	end
@@ -1682,7 +1733,7 @@ end
 
 task.spawn(function()
 	while gui.Parent do
-		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 			stopFloatIfIdle()
 		else
 			if not isCharacterReady() then
@@ -1712,7 +1763,7 @@ local function flyTo(pos, token)
 		return false
 	end
 
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		forceStopFloat()
 		return false
 	end
@@ -1734,7 +1785,7 @@ local function flyTo(pos, token)
 	tween:Play()
 
 	while tween.PlaybackState == Enum.PlaybackState.Playing do
-		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards) then
+		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards) then
 			tween:Cancel()
 			forceStopFloat()
 			return false
@@ -2463,6 +2514,152 @@ local function runAutoBuyDrinkAmount()
 
 		autoBuyDrinkRunning = false
 		stopFloatIfIdle()
+	end)
+end
+
+
+
+
+--// AUTO USE DRINK BY AMOUNT
+-- Uống Cider / Lemonade / Juice / Smoothie theo số lượng.
+-- Bản nhanh: đánh dấu tool đã uống để không click lặp lại tool cũ, không cần đợi tool biến mất.
+local usedDrinkCache = {}
+
+local function getUseDrinkDelay()
+	local n = tonumber(Config.UseDrinkDelay) or 0.15
+	return math.clamp(n, 0.03, 3)
+end
+
+local function useDrinkToolFast(tool)
+	if not tool or not tool.Parent then return false end
+	if usedDrinkCache[tool] then return false end
+	if not isCharacterReady() then return false end
+
+	local char, hrp, hum = getChar()
+	if not char or not hum then return false end
+
+	-- Đánh dấu trước để vòng sau không quét lại đúng ly đang uống.
+	usedDrinkCache[tool] = true
+
+	if tool.Parent ~= char then
+		hum:EquipTool(tool)
+		task.wait(0.05)
+	end
+
+	if not tool or not tool.Parent then return false end
+
+	pcall(function()
+		tool:Activate()
+	end)
+
+	return true
+end
+
+local function useDrinkByAmount(typeName, amount)
+	if not isCharacterReady() then return 0 end
+
+	amount = math.floor(tonumber(amount) or 0)
+	if amount <= 0 then return 0 end
+
+	local used = 0
+
+	while Config.AutoUseDrinkAmount and used < amount and isCharacterReady() do
+		local tools = getTools(typeName)
+		if #tools == 0 then break end
+
+		local picked = nil
+
+		for _, tool in ipairs(tools) do
+			if tool and tool.Parent and not usedDrinkCache[tool] then
+				picked = tool
+				break
+			end
+		end
+
+		if not picked then
+			break
+		end
+
+		local ok = useDrinkToolFast(picked)
+
+		if ok then
+			used += 1
+		else
+			break
+		end
+
+		task.wait(getUseDrinkDelay())
+	end
+
+	return used
+end
+
+local function doUseDrinkAmountOnce()
+	if not Config.AutoUseDrinkAmount then return end
+	if not isCharacterReady() then return end
+
+	local ciderNeed = getDropAmountValue("UseCiderAmount")
+	local lemonadeNeed = getDropAmountValue("UseLemonadeAmount")
+	local juiceNeed = getDropAmountValue("UseJuiceAmount")
+	local smoothieNeed = getDropAmountValue("UseSmoothieAmount")
+
+	if ciderNeed > 0 then
+		print("[PennyHub] Use Cider:", ciderNeed)
+		useDrinkByAmount("Cider", ciderNeed)
+	end
+
+	if lemonadeNeed > 0 then
+		print("[PennyHub] Use Lemonade:", lemonadeNeed)
+		useDrinkByAmount("Lemonade", lemonadeNeed)
+	end
+
+	if juiceNeed > 0 then
+		print("[PennyHub] Use Juice:", juiceNeed)
+		useDrinkByAmount("Juice", juiceNeed)
+	end
+
+	if smoothieNeed > 0 then
+		print("[PennyHub] Use Smoothie:", smoothieNeed)
+		useDrinkByAmount("Smoothie", smoothieNeed)
+	end
+end
+
+local function runAutoUseDrinkAmount()
+	if autoUseDrinkRunning then return end
+	autoUseDrinkRunning = true
+
+	-- Reset cache mỗi lần bật để lần chạy mới vẫn dùng được item mới.
+	usedDrinkCache = {}
+
+	task.spawn(function()
+		while Config.AutoUseDrinkAmount do
+			if Config.AutoWoodRodQuest then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
+			if not isCharacterReady() then
+				task.wait(0.5)
+				continue
+			end
+
+			local ok, err = pcall(function()
+				doUseDrinkAmountOnce()
+			end)
+
+			if not ok then
+				warn("[PennyHub] Auto Use Drink Amount error:", err)
+			end
+
+			Config.AutoUseDrinkAmount = false
+			saveIndexConfig()
+			refreshAll()
+
+			task.wait(1)
+		end
+
+		autoUseDrinkRunning = false
 	end)
 end
 
@@ -3464,6 +3661,96 @@ textbox(buyDrinkMainCard, "0.15", 400, 96, 80, 30,
 label(buyDrinkMainCard, "Mua từng ly: tự mở lại UI sau mỗi lần mua.", 20, 270, 420, 24)
 label(buyDrinkMainCard, "Cần đứng gần / đã mở shop nếu remote yêu cầu.", 20, 295, 420, 24)
 label(buyDrinkMainCard, "Dùng Cider+ / Lemonade+ / Juice+ / Smoothie+.", 20, 320, 420, 24)
+
+
+
+
+useDrinkMainCard = card(mainTab, "Use Drink Amount", 20, 1360, 560, 360)
+
+toggle(useDrinkMainCard, "AutoUseDrinkAmount", "Uống Nước Theo Số Lượng", 20, 50, 240, 34, function(state)
+	if state then
+		runAutoUseDrinkAmount()
+	end
+end)
+
+label(useDrinkMainCard, "Cider", 20, 100, 100, 24)
+textbox(useDrinkMainCard, "0", 145, 96, 80, 30,
+	function()
+		return tostring(Config.UseCiderAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.UseCiderAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(useDrinkMainCard, "Lemonade", 20, 140, 120, 24)
+textbox(useDrinkMainCard, "0", 145, 136, 80, 30,
+	function()
+		return tostring(Config.UseLemonadeAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.UseLemonadeAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(useDrinkMainCard, "Juice", 20, 180, 100, 24)
+textbox(useDrinkMainCard, "0", 145, 176, 80, 30,
+	function()
+		return tostring(Config.UseJuiceAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.UseJuiceAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(useDrinkMainCard, "Smoothie", 20, 220, 120, 24)
+textbox(useDrinkMainCard, "0", 145, 216, 80, 30,
+	function()
+		return tostring(Config.UseSmoothieAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.UseSmoothieAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(useDrinkMainCard, "Use Delay", 300, 100, 100, 24)
+textbox(useDrinkMainCard, "0.15", 400, 96, 80, 30,
+	function()
+		return tostring(Config.UseDrinkDelay or 0.2)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.UseDrinkDelay = math.clamp(n, 0.05, 3)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(useDrinkMainCard, "Uống trực tiếp từ inventory.", 20, 270, 300, 24)
+label(useDrinkMainCard, "Bản nhanh: không uống lặp lại cùng một ly.", 20, 295, 420, 24)
+label(useDrinkMainCard, "Dùng đủ số lượng sẽ tự tắt.", 20, 320, 300, 24)
 
 
 -- Farming
