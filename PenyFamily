@@ -2356,7 +2356,7 @@ local function clickDrinkUI(drinkName)
 	return clickGuiObject(target)
 end
 
-local function buyDrinkByClick(drinkName, amount)
+local function buyDrinkByClick(drinkName, amount, token)
 	amount = math.floor(tonumber(amount) or 0)
 	if amount <= 0 then return 0 end
 
@@ -2365,12 +2365,18 @@ local function buyDrinkByClick(drinkName, amount)
 	for i = 1, amount do
 		if not Config.AutoBuyDrinkAmount then break end
 		if not isCharacterReady() then break end
+		if token and token ~= actionToken then break end
+
+		-- UI shop sẽ tự tắt sau mỗi lần mua, nên phải mở lại trước từng lần click.
+		openDrinkMerchant()
+		task.wait(0.65)
 
 		local ok = clickDrinkUI(drinkName)
 
 		if ok then
 			bought += 1
 		else
+			warn("[PennyHub] Click mua nước thất bại:", drinkName)
 			break
 		end
 
@@ -2399,22 +2405,22 @@ local function doBuyDrinkAmountOnce(token)
 
 	if ciderNeed > 0 then
 		print("[PennyHub] Buy Cider+ by click:", ciderNeed)
-		buyDrinkByClick("Cider+", ciderNeed)
+		buyDrinkByClick("Cider+", ciderNeed, token)
 	end
 
 	if lemonadeNeed > 0 then
 		print("[PennyHub] Buy Lemonade+ by click:", lemonadeNeed)
-		buyDrinkByClick("Lemonade+", lemonadeNeed)
+		buyDrinkByClick("Lemonade+", lemonadeNeed, token)
 	end
 
 	if juiceNeed > 0 then
 		print("[PennyHub] Buy Juice+ by click:", juiceNeed)
-		buyDrinkByClick("Juice+", juiceNeed)
+		buyDrinkByClick("Juice+", juiceNeed, token)
 	end
 
 	if smoothieNeed > 0 then
 		print("[PennyHub] Buy Smoothie+ by click:", smoothieNeed)
-		buyDrinkByClick("Smoothie+", smoothieNeed)
+		buyDrinkByClick("Smoothie+", smoothieNeed, token)
 	end
 end
 
@@ -3455,7 +3461,7 @@ textbox(buyDrinkMainCard, "0.15", 400, 96, 80, 30,
 	false
 )
 
-label(buyDrinkMainCard, "Mua đủ số lượng sẽ tự tắt.", 20, 270, 260, 24)
+label(buyDrinkMainCard, "Mua từng ly: tự mở lại UI sau mỗi lần mua.", 20, 270, 420, 24)
 label(buyDrinkMainCard, "Cần đứng gần / đã mở shop nếu remote yêu cầu.", 20, 295, 420, 24)
 label(buyDrinkMainCard, "Dùng Cider+ / Lemonade+ / Juice+ / Smoothie+.", 20, 320, 420, 24)
 
