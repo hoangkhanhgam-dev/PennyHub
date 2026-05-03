@@ -30,6 +30,23 @@ local Config = {
 	AfkArenaAuto = false,
 	AutoGetAfkReward = false,
 	AutoDropSam = false,
+	AutoDropCompassAmount = false,
+	DropCompassAmount = 0,
+	DropSilverCompassAmount = 0,
+	DropGoldenCompassAmount = 0,
+
+	AutoDropDrinkAmount = false,
+	DropCiderAmount = 0,
+	DropLemonadeAmount = 0,
+	DropJuiceAmount = 0,
+	DropSmoothieAmount = 0,
+
+	AutoBuyDrinkAmount = false,
+	BuyCiderAmount = 0,
+	BuyLemonadeAmount = 0,
+	BuyJuiceAmount = 0,
+	BuySmoothieAmount = 0,
+	BuyDrinkDelay = 0.15,
 	AutoChangeNoAfkRewards = false,
 	AutoGemGiftBox = false,
 	AutoBeriGiftBox = false,
@@ -46,7 +63,6 @@ local Config = {
 	AutoSpawnRespawnDelay = 3.5,
 	AutoSpawnUIStable = 1,
 	AutoSpawnScriptDelay = 4,
-	HubStartDelay = 8,
 
 	WebhookEnabled = false,
 	WebhookURL = "",
@@ -124,26 +140,6 @@ local function safeDecode(raw)
 		return result
 	end
 	return nil
-end
-
-
-local function parseInfiniteDelay(value, defaultValue)
-	local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-
-	if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
-		return math.huge
-	end
-
-	local n = tonumber(value)
-	if not n then
-		return defaultValue
-	end
-
-	if n < 0 then
-		return 0
-	end
-
-	return n
 end
 
 local function applyTableToConfig(data)
@@ -307,6 +303,21 @@ do
 		Config.AfkArenaAuto = false
 		Config.AutoGetAfkReward = false
 		Config.AutoDropSam = false
+		Config.AutoDropCompassAmount = false
+		Config.DropCompassAmount = tonumber(Config.DropCompassAmount) or 0
+		Config.DropSilverCompassAmount = tonumber(Config.DropSilverCompassAmount) or 0
+		Config.DropGoldenCompassAmount = tonumber(Config.DropGoldenCompassAmount) or 0
+		Config.AutoDropDrinkAmount = false
+		Config.DropCiderAmount = tonumber(Config.DropCiderAmount) or 0
+		Config.DropLemonadeAmount = tonumber(Config.DropLemonadeAmount) or 0
+		Config.DropJuiceAmount = tonumber(Config.DropJuiceAmount) or 0
+		Config.DropSmoothieAmount = tonumber(Config.DropSmoothieAmount) or 0
+		Config.AutoBuyDrinkAmount = false
+		Config.BuyCiderAmount = tonumber(Config.BuyCiderAmount) or 0
+		Config.BuyLemonadeAmount = tonumber(Config.BuyLemonadeAmount) or 0
+		Config.BuyJuiceAmount = tonumber(Config.BuyJuiceAmount) or 0
+		Config.BuySmoothieAmount = tonumber(Config.BuySmoothieAmount) or 0
+		Config.BuyDrinkDelay = tonumber(Config.BuyDrinkDelay) or 0.15
 		Config.AutoChangeNoAfkRewards = false
 		Config.AutoGemGiftBox = false
 		Config.AutoBeriGiftBox = false
@@ -318,10 +329,9 @@ do
 		Config.DropNoClip = Config.DropNoClip ~= false
 		Config.DropPinOffsetY = tonumber(Config.DropPinOffsetY) or 3
 		Config.AutoSpawn = false
-		Config.AutoSpawnRespawnDelay = Config.AutoSpawnRespawnDelay or 3.5
-		Config.AutoSpawnUIStable = Config.AutoSpawnUIStable or 1
-		Config.AutoSpawnScriptDelay = Config.AutoSpawnScriptDelay or 4
-		Config.HubStartDelay = Config.HubStartDelay or 8
+		Config.AutoSpawnRespawnDelay = tonumber(Config.AutoSpawnRespawnDelay) or 3.5
+		Config.AutoSpawnUIStable = tonumber(Config.AutoSpawnUIStable) or 1
+		Config.AutoSpawnScriptDelay = tonumber(Config.AutoSpawnScriptDelay) or 4
 		Config.WebhookEnabled = false
 		Config.WebhookURL = ""
 		Config.DiscordID = ""
@@ -349,7 +359,7 @@ pcall(function()
 end)
 
 --// GUI BASE
-local gui = Instance.new("ScreenGui")
+gui = Instance.new("ScreenGui")
 gui.Name = "PennyHub"
 gui.ResetOnSpawn = false
 
@@ -388,7 +398,7 @@ task.spawn(function()
 	end
 end)
 
-local main = Instance.new("Frame")
+main = Instance.new("Frame")
 main.Parent = gui
 main.Size = UDim2.new(0, 820, 0, 500)
 main.Position = UDim2.new(0.5, -410, 0.5, -250)
@@ -399,7 +409,7 @@ main.ClipsDescendants = true
 main.ZIndex = 1
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
 
-local glass = Instance.new("Frame")
+glass = Instance.new("Frame")
 glass.Parent = main
 glass.Size = UDim2.new(1, 0, 1, 0)
 glass.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -407,7 +417,7 @@ glass.BackgroundTransparency = 0.94
 glass.ZIndex = 1
 Instance.new("UICorner", glass).CornerRadius = UDim.new(0, 14)
 
-local overlay = Instance.new("Frame")
+overlay = Instance.new("Frame")
 overlay.Parent = main
 overlay.Size = UDim2.new(1, 0, 1, 0)
 overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -415,13 +425,13 @@ overlay.BackgroundTransparency = 0.38
 overlay.ZIndex = 1
 Instance.new("UICorner", overlay).CornerRadius = UDim.new(0, 14)
 
-local stroke = Instance.new("UIStroke")
+stroke = Instance.new("UIStroke")
 stroke.Parent = main
 stroke.Thickness = 2
 stroke.Color = ThemeMain
 stroke.Transparency = 0.1
 
-local glow = Instance.new("UIStroke")
+glow = Instance.new("UIStroke")
 glow.Parent = main
 glow.Thickness = 8
 glow.Transparency = 0.82
@@ -441,7 +451,7 @@ task.spawn(function()
 end)
 
 -- mouse glow
-local mouseGlow = Instance.new("Frame")
+mouseGlow = Instance.new("Frame")
 mouseGlow.Parent = main
 mouseGlow.Size = UDim2.new(0, 240, 0, 240)
 mouseGlow.BackgroundColor3 = ThemeGlow
@@ -485,14 +495,14 @@ for i = 1, 18 do
 end
 
 -- topbar
-local topbar = Instance.new("Frame")
+topbar = Instance.new("Frame")
 topbar.Parent = main
 topbar.Size = UDim2.new(1, 0, 0, 42)
 topbar.BackgroundColor3 = Color3.fromRGB(5, 7, 12)
 topbar.BackgroundTransparency = 0.3
 topbar.ZIndex = 3
 
-local title = Instance.new("TextLabel")
+title = Instance.new("TextLabel")
 title.Parent = topbar
 title.Size = UDim2.new(0, 200, 1, 0)
 title.Position = UDim2.new(0, 15, 0, 0)
@@ -504,12 +514,12 @@ title.TextSize = 21
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 4
 
-local titleStroke = Instance.new("UIStroke")
+titleStroke = Instance.new("UIStroke")
 titleStroke.Parent = title
 titleStroke.Color = ThemeGlow
 titleStroke.Transparency = 0.7
 
-local subtitle = Instance.new("TextLabel")
+subtitle = Instance.new("TextLabel")
 subtitle.Parent = topbar
 subtitle.Size = UDim2.new(0, 420, 1, 0)
 subtitle.Position = UDim2.new(0, 145, 0, 1)
@@ -521,7 +531,7 @@ subtitle.TextSize = 13
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.ZIndex = 4
 
-local close = Instance.new("TextButton")
+close = Instance.new("TextButton")
 close.Parent = topbar
 close.Size = UDim2.new(0, 28, 0, 28)
 close.Position = UDim2.new(1, -40, 0, 7)
@@ -534,12 +544,12 @@ close.TextSize = 14
 close.ZIndex = 4
 Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
 
-local closeStroke = Instance.new("UIStroke")
+closeStroke = Instance.new("UIStroke")
 closeStroke.Parent = close
 closeStroke.Color = ThemeMain
 closeStroke.Transparency = 0.4
 
-local hotkeyHint = Instance.new("TextLabel")
+hotkeyHint = Instance.new("TextLabel")
 hotkeyHint.Parent = topbar
 hotkeyHint.Size = UDim2.new(0, 120, 0, 28)
 hotkeyHint.Position = UDim2.new(1, -165, 0, 7)
@@ -552,7 +562,7 @@ hotkeyHint.TextXAlignment = Enum.TextXAlignment.Right
 hotkeyHint.ZIndex = 4
 
 -- sidebar/content
-local sidebar = Instance.new("Frame")
+sidebar = Instance.new("Frame")
 sidebar.Parent = main
 sidebar.Position = UDim2.new(0, 0, 0, 42)
 sidebar.Size = UDim2.new(0, 180, 1, -42)
@@ -560,7 +570,7 @@ sidebar.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
 sidebar.BackgroundTransparency = 0.42
 sidebar.ZIndex = 3
 
-local content = Instance.new("Frame")
+content = Instance.new("Frame")
 content.Parent = main
 content.Position = UDim2.new(0, 180, 0, 42)
 content.Size = UDim2.new(1, -180, 1, -42)
@@ -572,7 +582,7 @@ content.ZIndex = 3
 local isOpen = true
 
 -- OPEN HUB cũ được giữ dạng ẩn để không phá luồng cũ, nhưng sẽ không hiện nữa.
-local openBtn = Instance.new("TextButton")
+openBtn = Instance.new("TextButton")
 openBtn.Name = "OldOpenHub_Disabled"
 openBtn.Parent = gui
 openBtn.Size = UDim2.new(0, 0, 0, 0)
@@ -585,7 +595,7 @@ openBtn.Active = false
 openBtn.ZIndex = 1
 
 -- Nút hỗ trợ bật/tắt hub: icon tròn + glow + hover + kéo di chuyển được.
-local quickToggleBtn = Instance.new("TextButton")
+quickToggleBtn = Instance.new("TextButton")
 quickToggleBtn.Name = "PennyQuickToggle"
 quickToggleBtn.Parent = gui
 quickToggleBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -601,11 +611,11 @@ quickToggleBtn.ZIndex = 999
 quickToggleBtn.AutoButtonColor = false
 Instance.new("UICorner", quickToggleBtn).CornerRadius = UDim.new(1, 0)
 
-local quickScale = Instance.new("UIScale")
+quickScale = Instance.new("UIScale")
 quickScale.Parent = quickToggleBtn
 quickScale.Scale = 1
 
-local quickGradient = Instance.new("UIGradient")
+quickGradient = Instance.new("UIGradient")
 quickGradient.Parent = quickToggleBtn
 quickGradient.Rotation = 45
 quickGradient.Color = ColorSequence.new({
@@ -614,19 +624,19 @@ quickGradient.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(1, Color3.fromRGB(95, 115, 155))
 })
 
-local quickStroke = Instance.new("UIStroke")
+quickStroke = Instance.new("UIStroke")
 quickStroke.Parent = quickToggleBtn
 quickStroke.Thickness = 2
 quickStroke.Color = ThemeMain
 quickStroke.Transparency = 0.22
 
-local quickGlow = Instance.new("UIStroke")
+quickGlow = Instance.new("UIStroke")
 quickGlow.Parent = quickToggleBtn
 quickGlow.Thickness = 8
 quickGlow.Color = ThemeGlow
 quickGlow.Transparency = 0.76
 
-local quickShadow = Instance.new("Frame")
+quickShadow = Instance.new("Frame")
 quickShadow.Name = "GlowShadow"
 quickShadow.Parent = gui
 quickShadow.Size = UDim2.new(0, 64, 0, 64)
@@ -637,7 +647,7 @@ quickShadow.BorderSizePixel = 0
 quickShadow.ZIndex = 998
 Instance.new("UICorner", quickShadow).CornerRadius = UDim.new(1, 0)
 
-local shadowScale = Instance.new("UIScale")
+shadowScale = Instance.new("UIScale")
 shadowScale.Parent = quickShadow
 shadowScale.Scale = 1
 
@@ -1361,6 +1371,9 @@ local DROP_POSITIONS = {
 
 local autoRewardRunning = false
 local autoDropRunning = false
+local autoDropAmountRunning = false
+local autoDropDrinkRunning = false
+local autoBuyDrinkRunning = false
 local autoChangeNoAfkRewardsRunning = false
 local floatBV, floatBG
 local floatActive = false
@@ -1384,7 +1397,7 @@ end
 local characterReadyAt = 0
 
 local function getAutoSpawnScriptDelay()
-	return parseInfiniteDelay(Config.AutoSpawnScriptDelay, 4)
+	return math.clamp(tonumber(Config.AutoSpawnScriptDelay) or 4, 0, 15)
 end
 
 local function markCharacterNotReady()
@@ -1652,7 +1665,7 @@ end
 
 
 local function stopFloatIfIdle()
-	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoChangeNoAfkRewards then return end
+	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
 	if floatActive or floatBV or floatBG then
 		forceStopFloat()
 	end
@@ -1661,7 +1674,7 @@ end
 local function cancelCurrentAutoMove()
 	actionToken += 1
 	stopDropPin()
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoChangeNoAfkRewards then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		actionBusy = false
 		forceStopFloat()
 	end
@@ -1669,7 +1682,7 @@ end
 
 task.spawn(function()
 	while gui.Parent do
-		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoChangeNoAfkRewards then
+		if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 			stopFloatIfIdle()
 		else
 			if not isCharacterReady() then
@@ -1699,7 +1712,7 @@ local function flyTo(pos, token)
 		return false
 	end
 
-	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoChangeNoAfkRewards then
+	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
 		forceStopFloat()
 		return false
 	end
@@ -1721,7 +1734,7 @@ local function flyTo(pos, token)
 	tween:Play()
 
 	while tween.PlaybackState == Enum.PlaybackState.Playing do
-		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoChangeNoAfkRewards) then
+		if token ~= actionToken or (not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoChangeNoAfkRewards) then
 			tween:Cancel()
 			forceStopFloat()
 			return false
@@ -1781,6 +1794,14 @@ local function itemMatch(name, typeName)
 		return name == "silver compass" or name == "silvercompass" or name:find("silver") ~= nil
 	elseif typeName == "GoldenCompass" then
 		return name == "golden compass" or name == "goldencompass" or name:find("golden") ~= nil
+	elseif typeName == "Cider" then
+		return name == "cider" or name:find("cider") ~= nil
+	elseif typeName == "Lemonade" then
+		return name == "lemonade" or name:find("lemonade") ~= nil
+	elseif typeName == "Juice" then
+		return name == "juice" or name:find("juice") ~= nil
+	elseif typeName == "Smoothie" then
+		return name == "smoothie" or name:find("smoothie") ~= nil
 	end
 
 	return false
@@ -1930,6 +1951,516 @@ local function doDropSamOnce(token)
 	dropAll("GoldenCompass", DROP_POSITIONS.GoldenCompass, token)
 end
 
+
+
+--// AUTO DROP COMPASS BY AMOUNT
+-- Drop theo số lượng, không bay tới vị trí cố định, không ghim vị trí.
+-- Nó sẽ drop ngay tại chỗ nhân vật đang đứng, nên vẫn có thể di chuyển tự do.
+local function getDropAmountValue(key)
+	local n = tonumber(Config[key]) or 0
+	n = math.floor(n)
+	if n < 0 then n = 0 end
+	return n
+end
+
+local function dropSomeTools(typeName, amount)
+	if not isCharacterReady() then return 0 end
+
+	amount = math.floor(tonumber(amount) or 0)
+	if amount <= 0 then return 0 end
+
+	local dropped = 0
+
+	while Config.AutoDropCompassAmount and dropped < amount and isCharacterReady() do
+		local tools = getTools(typeName)
+		if #tools == 0 then break end
+
+		local tool = tools[1]
+		if not tool then break end
+
+		dropTool(tool)
+		dropped += 1
+		task.wait(0.12)
+	end
+
+	return dropped
+end
+
+local function doDropCompassAmountOnce()
+	if not Config.AutoDropCompassAmount then return end
+	if not isCharacterReady() then return end
+
+	local compassNeed = getDropAmountValue("DropCompassAmount")
+	local silverNeed = getDropAmountValue("DropSilverCompassAmount")
+	local goldenNeed = getDropAmountValue("DropGoldenCompassAmount")
+
+	if compassNeed > 0 then
+		print("[PennyHub] Drop amount Compass:", compassNeed)
+		dropSomeTools("Compass", compassNeed)
+	end
+
+	if silverNeed > 0 then
+		print("[PennyHub] Drop amount Silver Compass:", silverNeed)
+		dropSomeTools("SilverCompass", silverNeed)
+	end
+
+	if goldenNeed > 0 then
+		print("[PennyHub] Drop amount Golden Compass:", goldenNeed)
+		dropSomeTools("GoldenCompass", goldenNeed)
+	end
+end
+
+local function runAutoDropCompassAmount()
+	if autoDropAmountRunning then return end
+	autoDropAmountRunning = true
+
+	task.spawn(function()
+		while Config.AutoDropCompassAmount do
+			if Config.AutoWoodRodQuest then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
+			if not isCharacterReady() then
+				task.wait(0.5)
+				continue
+			end
+
+			local ok, err = pcall(function()
+				doDropCompassAmountOnce()
+			end)
+
+			if not ok then
+				warn("[PennyHub] Auto Drop Compass Amount error:", err)
+			end
+
+			-- Drop xong đúng số lượng đã nhập thì tự tắt, tránh drop lặp vô hạn.
+			Config.AutoDropCompassAmount = false
+			saveIndexConfig()
+			refreshAll()
+
+			task.wait(1)
+		end
+
+		autoDropAmountRunning = false
+	end)
+end
+
+
+
+
+--// AUTO DROP DRINK BY AMOUNT
+-- Drop theo số lượng các ly nước: Cider / Lemonade / Juice / Smoothie.
+-- Bỏ qua Melee. Drop ngay tại chỗ đang đứng, không bay, không ghim vị trí.
+local function dropSomeDrinkTools(typeName, amount)
+	if not isCharacterReady() then return 0 end
+
+	amount = math.floor(tonumber(amount) or 0)
+	if amount <= 0 then return 0 end
+
+	local dropped = 0
+
+	while Config.AutoDropDrinkAmount and dropped < amount and isCharacterReady() do
+		local tools = getTools(typeName)
+		if #tools == 0 then break end
+
+		local tool = tools[1]
+		if not tool then break end
+
+		dropTool(tool)
+		dropped += 1
+		task.wait(0.12)
+	end
+
+	return dropped
+end
+
+local function doDropDrinkAmountOnce()
+	if not Config.AutoDropDrinkAmount then return end
+	if not isCharacterReady() then return end
+
+	local ciderNeed = getDropAmountValue("DropCiderAmount")
+	local lemonadeNeed = getDropAmountValue("DropLemonadeAmount")
+	local juiceNeed = getDropAmountValue("DropJuiceAmount")
+	local smoothieNeed = getDropAmountValue("DropSmoothieAmount")
+
+	if ciderNeed > 0 then
+		print("[PennyHub] Drop amount Cider:", ciderNeed)
+		dropSomeDrinkTools("Cider", ciderNeed)
+	end
+
+	if lemonadeNeed > 0 then
+		print("[PennyHub] Drop amount Lemonade:", lemonadeNeed)
+		dropSomeDrinkTools("Lemonade", lemonadeNeed)
+	end
+
+	if juiceNeed > 0 then
+		print("[PennyHub] Drop amount Juice:", juiceNeed)
+		dropSomeDrinkTools("Juice", juiceNeed)
+	end
+
+	if smoothieNeed > 0 then
+		print("[PennyHub] Drop amount Smoothie:", smoothieNeed)
+		dropSomeDrinkTools("Smoothie", smoothieNeed)
+	end
+end
+
+local function runAutoDropDrinkAmount()
+	if autoDropDrinkRunning then return end
+	autoDropDrinkRunning = true
+
+	task.spawn(function()
+		while Config.AutoDropDrinkAmount do
+			if Config.AutoWoodRodQuest then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
+			if not isCharacterReady() then
+				task.wait(0.5)
+				continue
+			end
+
+			local ok, err = pcall(function()
+				doDropDrinkAmountOnce()
+			end)
+
+			if not ok then
+				warn("[PennyHub] Auto Drop Drink Amount error:", err)
+			end
+
+			Config.AutoDropDrinkAmount = false
+			saveIndexConfig()
+			refreshAll()
+
+			task.wait(1)
+		end
+
+		autoDropDrinkRunning = false
+	end)
+end
+
+
+
+
+--// AUTO BUY DRINK BY AMOUNT
+-- Mua Cider+ / Lemonade+ / Juice+ / Smoothie+ theo số lượng.
+-- Cơ chế mới: bay tới BetterDrinkMerchant, mở shop, rồi CLICK UI thật để mua.
+local function getBuyDrinkDelay()
+	local n = tonumber(Config.BuyDrinkDelay) or 0.2
+	return math.clamp(n, 0.08, 5)
+end
+
+local function getDrinkMerchant()
+	return workspace:WaitForChild("Merchants"):WaitForChild("BetterDrinkMerchant")
+end
+
+local function openDrinkMerchant()
+	local npc = getDrinkMerchant()
+
+	local clickDetector = npc:FindFirstChildWhichIsA("ClickDetector", true)
+	if clickDetector and fireclickdetector then
+		fireclickdetector(clickDetector)
+		print("[PennyHub] Opened BetterDrinkMerchant with ClickDetector")
+		return true
+	end
+
+	local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
+	if prompt and fireproximityprompt then
+		fireproximityprompt(prompt)
+		print("[PennyHub] Opened BetterDrinkMerchant with ProximityPrompt")
+		return true
+	end
+
+	warn("[PennyHub] Không mở được BetterDrinkMerchant.")
+	return false
+end
+
+local function goToDrinkMerchant(token)
+	token = token or actionToken
+
+	if not isCharacterReady() then return false end
+	if not startFloat() then return false end
+
+	local npc = getDrinkMerchant()
+	local npcPart = getNpcPart(npc)
+
+	if not npcPart then
+		warn("[PennyHub] Không tìm thấy part của BetterDrinkMerchant.")
+		return false
+	end
+
+	if not flyTo(npcPart.Position + Vector3.new(0, 4, 5), token) then
+		return false
+	end
+
+	task.wait(0.2)
+
+	local char, hrp = getChar()
+	if not char or not hrp then return false end
+
+	hrp.CFrame = CFrame.lookAt(hrp.Position, npcPart.Position)
+	if floatBG then
+		floatBG.CFrame = hrp.CFrame
+	end
+
+	task.wait(0.3)
+	openDrinkMerchant()
+	task.wait(1)
+
+	return true
+end
+
+local function isGuiReallyVisible(obj)
+	if not obj or not obj:IsA("GuiObject") then return false end
+	if not obj.Visible then return false end
+
+	local cur = obj.Parent
+	while cur do
+		if cur:IsA("GuiObject") and not cur.Visible then
+			return false
+		end
+		cur = cur.Parent
+	end
+
+	return true
+end
+
+local function getTextOfGui(obj)
+	if not obj then return "" end
+
+	if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+		return tostring(obj.Text or "")
+	end
+
+	return ""
+end
+
+local function findClickableAncestor(obj)
+	local cur = obj
+
+	for i = 1, 8 do
+		if not cur then break end
+
+		if cur:IsA("TextButton") or cur:IsA("ImageButton") then
+			return cur
+		end
+
+		cur = cur.Parent
+	end
+
+	return nil
+end
+
+local function findDrinkClickTarget(drinkName)
+	local pg = player:FindFirstChild("PlayerGui")
+	if not pg then return nil end
+
+	local wanted = tostring(drinkName or ""):lower()
+
+	-- Ưu tiên tìm text đúng tên nước trong UI shop.
+	for _, v in ipairs(pg:GetDescendants()) do
+		if v:IsA("GuiObject") and isGuiReallyVisible(v) then
+			local txt = getTextOfGui(v):lower()
+
+			if txt == wanted or txt:find(wanted, 1, true) then
+				local btn = findClickableAncestor(v)
+				if btn then
+					return btn
+				end
+
+				-- Nếu text không nằm trong Button, click ngay vào chính TextLabel.
+				return v
+			end
+		end
+	end
+
+	-- Fallback: tìm object có Name chứa tên nước.
+	for _, v in ipairs(pg:GetDescendants()) do
+		if v:IsA("GuiObject") and isGuiReallyVisible(v) then
+			local nm = tostring(v.Name or ""):lower()
+
+			if nm:find(wanted, 1, true) then
+				local btn = findClickableAncestor(v)
+				return btn or v
+			end
+		end
+	end
+
+	return nil
+end
+
+local function clickGuiObject(obj)
+	if not obj or not obj:IsA("GuiObject") then return false end
+
+	local clicked = false
+
+	-- Nếu là GuiButton thì bắn signal trước.
+	if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+		if firesignal then
+			pcall(function()
+				firesignal(obj.MouseButton1Click)
+				clicked = true
+			end)
+
+			pcall(function()
+				firesignal(obj.Activated)
+				clicked = true
+			end)
+		end
+
+		if getconnections then
+			pcall(function()
+				for _, c in ipairs(getconnections(obj.MouseButton1Click)) do
+					c:Fire()
+					clicked = true
+				end
+			end)
+
+			pcall(function()
+				for _, c in ipairs(getconnections(obj.Activated)) do
+					c:Fire()
+					clicked = true
+				end
+			end)
+		end
+	end
+
+	-- Click chuột thật vào giữa object. Cách này hợp với UI shop dạng ImageLabel/TextLabel không có Button ancestor.
+	local pos = obj.AbsolutePosition
+	local size = obj.AbsoluteSize
+	local x = pos.X + size.X / 2
+	local y = pos.Y + size.Y / 2
+
+	pcall(function()
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+		task.wait(0.03)
+		VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+		clicked = true
+	end)
+
+	return clicked
+end
+
+local function clickDrinkUI(drinkName)
+	local target = findDrinkClickTarget(drinkName)
+
+	if not target then
+		warn("[PennyHub] Không tìm thấy UI để click:", drinkName)
+		return false
+	end
+
+	print("[PennyHub] Click drink UI:", drinkName, target:GetFullName())
+	return clickGuiObject(target)
+end
+
+local function buyDrinkByClick(drinkName, amount)
+	amount = math.floor(tonumber(amount) or 0)
+	if amount <= 0 then return 0 end
+
+	local bought = 0
+
+	for i = 1, amount do
+		if not Config.AutoBuyDrinkAmount then break end
+		if not isCharacterReady() then break end
+
+		local ok = clickDrinkUI(drinkName)
+
+		if ok then
+			bought += 1
+		else
+			break
+		end
+
+		task.wait(getBuyDrinkDelay())
+	end
+
+	return bought
+end
+
+local function doBuyDrinkAmountOnce(token)
+	if not Config.AutoBuyDrinkAmount then return end
+	if not isCharacterReady() then return end
+
+	token = token or actionToken
+
+	if not goToDrinkMerchant(token) then
+		return
+	end
+
+	if token ~= actionToken or not Config.AutoBuyDrinkAmount then return end
+
+	local ciderNeed = getDropAmountValue("BuyCiderAmount")
+	local lemonadeNeed = getDropAmountValue("BuyLemonadeAmount")
+	local juiceNeed = getDropAmountValue("BuyJuiceAmount")
+	local smoothieNeed = getDropAmountValue("BuySmoothieAmount")
+
+	if ciderNeed > 0 then
+		print("[PennyHub] Buy Cider+ by click:", ciderNeed)
+		buyDrinkByClick("Cider+", ciderNeed)
+	end
+
+	if lemonadeNeed > 0 then
+		print("[PennyHub] Buy Lemonade+ by click:", lemonadeNeed)
+		buyDrinkByClick("Lemonade+", lemonadeNeed)
+	end
+
+	if juiceNeed > 0 then
+		print("[PennyHub] Buy Juice+ by click:", juiceNeed)
+		buyDrinkByClick("Juice+", juiceNeed)
+	end
+
+	if smoothieNeed > 0 then
+		print("[PennyHub] Buy Smoothie+ by click:", smoothieNeed)
+		buyDrinkByClick("Smoothie+", smoothieNeed)
+	end
+end
+
+local function runAutoBuyDrinkAmount()
+	if autoBuyDrinkRunning then return end
+	autoBuyDrinkRunning = true
+
+	task.spawn(function()
+		while Config.AutoBuyDrinkAmount do
+			if Config.AutoWoodRodQuest then
+				forceStopFloat()
+				task.wait(0.5)
+				continue
+			end
+
+			if not isCharacterReady() then
+				task.wait(0.5)
+				continue
+			end
+
+			local myToken = actionToken
+			waitActionFree()
+
+			local ok, err = pcall(function()
+				doBuyDrinkAmountOnce(myToken)
+			end)
+
+			releaseAction()
+
+			if not ok then
+				warn("[PennyHub] Auto Buy Drink Amount error:", err)
+			end
+
+			Config.AutoBuyDrinkAmount = false
+			saveIndexConfig()
+			refreshAll()
+
+			task.wait(1)
+		end
+
+		autoBuyDrinkRunning = false
+		stopFloatIfIdle()
+	end)
+end
+
+
 --// AUTO CHANGE ACCOUNT AFTER DROP SAM EMPTY
 -- Không check UI AFK Reward nữa. Chỉ cần sau khi drop xong mà Backpack/Character
 -- không còn Compass/Silver/Golden Compass thì tạo file và kick để tool đổi acc.
@@ -1960,7 +2491,7 @@ end
 
 local function changeAccountAfterDropSam(token)
 	token = token or actionToken
-	if token ~= actionToken or not Config.AutoChangeNoAfkRewards then return false end
+	if token ~= actionToken or not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then return false end
 	if not isCharacterReady() then return false end
 
 	-- Chỉ check túi đồ / character, không check số trong UI AFK Reward nữa.
@@ -2434,11 +2965,11 @@ local autoSpawnClickedLock = true
 local autoSpawnHookedChars = {}
 
 local function getAutoSpawnRespawnDelay()
-	return parseInfiniteDelay(Config.AutoSpawnRespawnDelay, 3.5)
+	return math.clamp(tonumber(Config.AutoSpawnRespawnDelay) or 3.5, 0.5, 15)
 end
 
 local function getAutoSpawnUIStable()
-	return parseInfiniteDelay(Config.AutoSpawnUIStable, 1)
+	return math.clamp(tonumber(Config.AutoSpawnUIStable) or 1, 0, 10)
 end
 
 local function findSpawnButton()
@@ -2606,7 +3137,7 @@ local farmingTab = createTab("Farming", 1)
 local settingTab = createTab("Setting", 2)
 
 -- Main
-local mainCard = card(mainTab, "Main", 20, 20, 560, 520)
+mainCard = card(mainTab, "Main", 20, 20, 560, 520)
 label(mainCard, "Penny Hub Max UI", 20, 45, 300, 24)
 label(mainCard, "RightShift hoặc Left Alt để ẩn/hiện menu. Khi menu tắt, nút OPEN HUB sẽ hiện bên ngoài.", 20, 75, 500, 24)
 label(mainCard, "Các tab có thể cuộn chuột hoặc vuốt xuống để xem thêm.", 20, 105, 500, 24)
@@ -2641,15 +3172,9 @@ textbox(mainCard, "3.5", 135, 226, 80, 30,
 		return tostring(Config.AutoSpawnRespawnDelay or 3.5)
 	end,
 	function(value)
-		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
-			Config.AutoSpawnRespawnDelay = "inf"
-			saveIndexConfig()
-			return
-		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnRespawnDelay = math.max(n, 0)
+			Config.AutoSpawnRespawnDelay = math.clamp(n, 0.5, 15)
 			saveIndexConfig()
 		end
 	end,
@@ -2662,15 +3187,9 @@ textbox(mainCard, "1", 135, 266, 80, 30,
 		return tostring(Config.AutoSpawnUIStable or 1)
 	end,
 	function(value)
-		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
-			Config.AutoSpawnUIStable = "inf"
-			saveIndexConfig()
-			return
-		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnUIStable = math.max(n, 0)
+			Config.AutoSpawnUIStable = math.clamp(n, 0, 10)
 			saveIndexConfig()
 		end
 	end,
@@ -2683,15 +3202,9 @@ textbox(mainCard, "4", 135, 306, 80, 30,
 		return tostring(Config.AutoSpawnScriptDelay or 4)
 	end,
 	function(value)
-		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
-			Config.AutoSpawnScriptDelay = "inf"
-			saveIndexConfig()
-			return
-		end
 		local n = tonumber(value)
 		if n then
-			Config.AutoSpawnScriptDelay = math.max(n, 0)
+			Config.AutoSpawnScriptDelay = math.clamp(n, 0, 15)
 			saveIndexConfig()
 		end
 	end,
@@ -2699,29 +3212,6 @@ textbox(mainCard, "4", 135, 306, 80, 30,
 )
 
 label(mainCard, "Script Delay: thời gian chờ sau khi spawn rồi mới cho AFK/Fly/Drop hoạt động.", 20, 350, 520, 24)
-
-label(mainCard, "Hub Start Delay", 260, 230, 120, 24)
-textbox(mainCard, "8", 375, 226, 80, 30,
-	function()
-		return tostring(Config.HubStartDelay or 8)
-	end,
-	function(value)
-		local raw = tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
-		if raw == "inf" or raw == "infinite" or raw == "infinity" or raw == "vo cuc" or raw == "vô cực" then
-			Config.HubStartDelay = "inf"
-			saveIndexConfig()
-			return
-		end
-		local n = tonumber(value)
-		if n then
-			Config.HubStartDelay = math.max(n, 0)
-			saveIndexConfig()
-		end
-	end,
-	false
-)
-
-label(mainCard, "Nhập số lớn hoặc inf để delay vô hạn.", 260, 270, 260, 24)
 
 label(mainCard, "Gift Box Auto", 20, 385, 160, 24)
 toggle(mainCard, "AutoGemGiftBox", "Gem Gift Box", 20, 415, 240, 34, function(state)
@@ -2751,9 +3241,229 @@ textbox(mainCard, "2.5", 100, 451, 80, 30,
 	false
 )
 
+
+
+dropCompassMainCard = card(mainTab, "Drop Compass Amount", 20, 560, 270, 330)
+
+toggle(dropCompassMainCard, "AutoDropCompassAmount", "Drop Theo Số Lượng", 20, 50, 225, 34, function(state)
+	if state then
+		runAutoDropCompassAmount()
+	end
+end)
+
+label(dropCompassMainCard, "Compass", 20, 100, 100, 24)
+textbox(dropCompassMainCard, "0", 145, 96, 80, 30,
+	function()
+		return tostring(Config.DropCompassAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropCompassAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropCompassMainCard, "Silver Compass", 20, 140, 120, 24)
+textbox(dropCompassMainCard, "0", 145, 136, 80, 30,
+	function()
+		return tostring(Config.DropSilverCompassAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropSilverCompassAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropCompassMainCard, "Golden Compass", 20, 180, 120, 24)
+textbox(dropCompassMainCard, "0", 145, 176, 80, 30,
+	function()
+		return tostring(Config.DropGoldenCompassAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropGoldenCompassAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropCompassMainCard, "Drop ngay tại chỗ đang đứng.", 20, 220, 230, 24)
+label(dropCompassMainCard, "Không bay, không ghim vị trí.", 20, 245, 230, 24)
+label(dropCompassMainCard, "Drop đủ số lượng sẽ tự tắt.", 20, 270, 230, 24)
+
+dropDrinkMainCard = card(mainTab, "Drop Drink Amount", 310, 560, 270, 370)
+
+toggle(dropDrinkMainCard, "AutoDropDrinkAmount", "Drop Nước Theo Số Lượng", 20, 50, 225, 34, function(state)
+	if state then
+		runAutoDropDrinkAmount()
+	end
+end)
+
+label(dropDrinkMainCard, "Cider", 20, 100, 100, 24)
+textbox(dropDrinkMainCard, "0", 145, 96, 80, 30,
+	function()
+		return tostring(Config.DropCiderAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropCiderAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropDrinkMainCard, "Lemonade", 20, 140, 120, 24)
+textbox(dropDrinkMainCard, "0", 145, 136, 80, 30,
+	function()
+		return tostring(Config.DropLemonadeAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropLemonadeAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropDrinkMainCard, "Juice", 20, 180, 100, 24)
+textbox(dropDrinkMainCard, "0", 145, 176, 80, 30,
+	function()
+		return tostring(Config.DropJuiceAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropJuiceAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropDrinkMainCard, "Smoothie", 20, 220, 120, 24)
+textbox(dropDrinkMainCard, "0", 145, 216, 80, 30,
+	function()
+		return tostring(Config.DropSmoothieAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropSmoothieAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropDrinkMainCard, "Bỏ qua Melee.", 20, 265, 230, 24)
+label(dropDrinkMainCard, "Drop ngay tại chỗ đang đứng.", 20, 290, 230, 24)
+label(dropDrinkMainCard, "Drop đủ số lượng sẽ tự tắt.", 20, 315, 230, 24)
+
+buyDrinkMainCard = card(mainTab, "Buy Drink Amount", 20, 950, 560, 390)
+
+toggle(buyDrinkMainCard, "AutoBuyDrinkAmount", "Mua Nước Theo Số Lượng", 20, 50, 240, 34, function(state)
+	if state then
+		runAutoBuyDrinkAmount()
+	end
+end)
+
+label(buyDrinkMainCard, "Cider+", 20, 100, 100, 24)
+textbox(buyDrinkMainCard, "0", 145, 96, 80, 30,
+	function()
+		return tostring(Config.BuyCiderAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.BuyCiderAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(buyDrinkMainCard, "Lemonade+", 20, 140, 120, 24)
+textbox(buyDrinkMainCard, "0", 145, 136, 80, 30,
+	function()
+		return tostring(Config.BuyLemonadeAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.BuyLemonadeAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(buyDrinkMainCard, "Juice+", 20, 180, 100, 24)
+textbox(buyDrinkMainCard, "0", 145, 176, 80, 30,
+	function()
+		return tostring(Config.BuyJuiceAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.BuyJuiceAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(buyDrinkMainCard, "Smoothie+", 20, 220, 120, 24)
+textbox(buyDrinkMainCard, "0", 145, 216, 80, 30,
+	function()
+		return tostring(Config.BuySmoothieAmount or 0)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.BuySmoothieAmount = math.max(math.floor(n), 0)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(buyDrinkMainCard, "Buy Delay", 300, 100, 100, 24)
+textbox(buyDrinkMainCard, "0.15", 400, 96, 80, 30,
+	function()
+		return tostring(Config.BuyDrinkDelay or 0.15)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.BuyDrinkDelay = math.clamp(n, 0.05, 5)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(buyDrinkMainCard, "Mua đủ số lượng sẽ tự tắt.", 20, 270, 260, 24)
+label(buyDrinkMainCard, "Cần đứng gần / đã mở shop nếu remote yêu cầu.", 20, 295, 420, 24)
+label(buyDrinkMainCard, "Dùng Cider+ / Lemonade+ / Juice+ / Smoothie+.", 20, 320, 420, 24)
+
+
 -- Farming
-local farmCard = card(farmingTab, "Farming", 20, 20, 560, 360)
-toggle(farmCard, "AfkArenaAuto", "Auto AFK Arena", 20, 50, 240, 34, function(state)
+farmAutoCard = card(farmingTab, "Auto Farming", 20, 20, 270, 330)
+
+toggle(farmAutoCard, "AfkArenaAuto", "Auto AFK Arena", 20, 50, 225, 34, function(state)
 	if state then
 		startAfk()
 	else
@@ -2761,7 +3471,7 @@ toggle(farmCard, "AfkArenaAuto", "Auto AFK Arena", 20, 50, 240, 34, function(sta
 	end
 end)
 
-toggle(farmCard, "AutoGetAfkReward", "Auto Get AFK Reward", 20, 90, 240, 34, function(state)
+toggle(farmAutoCard, "AutoGetAfkReward", "Auto Get AFK Reward", 20, 90, 225, 34, function(state)
 	if state then
 		runGetAfkReward()
 	else
@@ -2769,7 +3479,7 @@ toggle(farmCard, "AutoGetAfkReward", "Auto Get AFK Reward", 20, 90, 240, 34, fun
 	end
 end)
 
-toggle(farmCard, "AutoDropSam", "Auto Drop Sam (Compass)", 20, 130, 240, 34, function(state)
+toggle(farmAutoCard, "AutoDropSam", "Auto Drop Sam", 20, 130, 225, 34, function(state)
 	if state then
 		runAutoDropSam()
 	else
@@ -2777,7 +3487,7 @@ toggle(farmCard, "AutoDropSam", "Auto Drop Sam (Compass)", 20, 130, 240, 34, fun
 	end
 end)
 
-toggle(farmCard, "AutoChangeNoAfkRewards", "Auto change accounts after drop all Sam", 20, 175, 510, 34, function(state)
+toggle(farmAutoCard, "AutoChangeNoAfkRewards", "Auto Change Account", 20, 170, 225, 34, function(state)
 	if state then
 		runAutoChangeNoAfkRewards()
 	else
@@ -2785,27 +3495,8 @@ toggle(farmCard, "AutoChangeNoAfkRewards", "Auto change accounts after drop all 
 	end
 end)
 
-toggle(farmCard, "DropPinEnabled", "Pin Position Khi Drop", 290, 50, 240, 34)
-toggle(farmCard, "DropNoClip", "NoClip Khi Drop", 290, 90, 240, 34)
-
-label(farmCard, "Drop Offset Y", 290, 135, 120, 24)
-textbox(farmCard, "3", 405, 131, 80, 30,
-	function()
-		return tostring(Config.DropPinOffsetY or 3)
-	end,
-	function(value)
-		local n = tonumber(value)
-		if n then
-			Config.DropPinOffsetY = math.clamp(n, 0, 10)
-			saveIndexConfig()
-		end
-	end,
-	false
-)
-
-toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 220, 240, 34, function(state)
+toggle(farmAutoCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 210, 225, 34, function(state)
 	if state then
-		-- Ưu tiên Auto Wood Rod: dừng các luồng bay/drop đang tranh quyền điều khiển nhân vật.
 		cancelCurrentAutoMove()
 		runAutoWoodRodQuest()
 	else
@@ -2813,8 +3504,8 @@ toggle(farmCard, "AutoWoodRodQuest", "Auto Wood Rod Quest", 20, 220, 240, 34, fu
 	end
 end)
 
-label(farmCard, "Wood Rod TP Delay", 290, 223, 120, 24)
-textbox(farmCard, "2", 415, 219, 80, 30,
+label(farmAutoCard, "Wood Rod TP Delay", 20, 255, 135, 24)
+textbox(farmAutoCard, "2", 155, 251, 70, 30,
 	function()
 		return tostring(Config.WoodRodTPDelay or 2)
 	end,
@@ -2828,15 +3519,38 @@ textbox(farmCard, "2", 415, 219, 80, 30,
 	false
 )
 
-label(farmCard, "Auto Wood Rod: nhận/giao Package, check Wood Rod rồi equip và tự tắt.", 20, 265, 520, 24)
+label(farmAutoCard, "Các auto chính. Drop/Buy theo số lượng đã chuyển sang Main.", 20, 295, 240, 24)
+
+dropFixedCard = card(farmingTab, "Drop Sam Fixed Settings", 310, 20, 270, 190)
+
+toggle(dropFixedCard, "DropPinEnabled", "Pin Position", 20, 50, 225, 34)
+toggle(dropFixedCard, "DropNoClip", "NoClip", 20, 90, 225, 34)
+
+label(dropFixedCard, "Drop Offset Y", 20, 135, 120, 24)
+textbox(dropFixedCard, "3", 145, 131, 80, 30,
+	function()
+		return tostring(Config.DropPinOffsetY or 3)
+	end,
+	function(value)
+		local n = tonumber(value)
+		if n then
+			Config.DropPinOffsetY = math.clamp(n, 0, 10)
+			saveIndexConfig()
+		end
+	end,
+	false
+)
+
+label(dropFixedCard, "Chỉ áp dụng Auto Drop Sam cố định.", 20, 165, 230, 24)
+
 
 -- Setting: Webhook
-local webhookCard = card(settingTab, "Webhook", 20, 20, 360, 455)
+webhookCard = card(settingTab, "Webhook", 20, 20, 360, 455)
 
 toggle(webhookCard, "WebhookEnabled", "Webhook", 20, 45, 260, 34)
 
 label(webhookCard, "Discord Webhook URL", 20, 88, 260, 22)
-local webhookBox = textbox(webhookCard, "Dán webhook URL vào đây", 20, 112, 310, 32,
+webhookBox = textbox(webhookCard, "Dán webhook URL vào đây", 20, 112, 310, 32,
 	function()
 		return Config.WebhookURL
 	end,
@@ -2847,7 +3561,7 @@ local webhookBox = textbox(webhookCard, "Dán webhook URL vào đây", 20, 112, 
 )
 
 label(webhookCard, "Discord ID để tag", 20, 152, 260, 22)
-local idBox = textbox(webhookCard, "Ví dụ: 811575137874739230", 20, 176, 310, 32,
+idBox = textbox(webhookCard, "Ví dụ: 811575137874739230", 20, 176, 310, 32,
 	function()
 		return Config.DiscordID
 	end,
@@ -2955,10 +3669,10 @@ local function copyCurrentConfig()
 end
 
 -- Setting: Config Manager
-local configCard = card(settingTab, "Config Manager", 400, 20, 210, 500)
+configCard = card(settingTab, "Config Manager", 400, 20, 210, 500)
 
 label(configCard, "Config name", 15, 45, 180, 22)
-local configNameBox = textbox(configCard, "Tên config", 15, 68, 180, 32,
+configNameBox = textbox(configCard, "Tên config", 15, 68, 180, 32,
 	function()
 		return Config.LastConfigName or ""
 	end,
@@ -2971,7 +3685,7 @@ local configNameBox = textbox(configCard, "Tên config", 15, 68, 180, 32,
 label(configCard, "Selected: " .. (Config.SelectedConfig ~= "" and Config.SelectedConfig or "None"), 15, 110, 180, 22)
 local selectedLabel = configCard:FindFirstChildWhichIsA("TextLabel", true)
 
-local configList = Instance.new("ScrollingFrame")
+configList = Instance.new("ScrollingFrame")
 configList.Parent = configCard
 configList.Position = UDim2.new(0, 15, 0, 135)
 configList.Size = UDim2.new(0, 180, 0, 130)
@@ -2986,19 +3700,19 @@ configList.Active = true
 configList.ZIndex = 6
 Instance.new("UICorner", configList).CornerRadius = UDim.new(0, 8)
 
-local listLayout = Instance.new("UIListLayout")
+listLayout = Instance.new("UIListLayout")
 listLayout.Parent = configList
 listLayout.Padding = UDim.new(0, 6)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local listPad = Instance.new("UIPadding")
+listPad = Instance.new("UIPadding")
 listPad.Parent = configList
 listPad.PaddingTop = UDim.new(0, 6)
 listPad.PaddingBottom = UDim.new(0, 6)
 listPad.PaddingLeft = UDim.new(0, 6)
 listPad.PaddingRight = UDim.new(0, 6)
 
-local selectedText = Instance.new("TextLabel")
+selectedText = Instance.new("TextLabel")
 selectedText.Parent = configCard
 selectedText.Size = UDim2.new(0, 180, 0, 22)
 selectedText.Position = UDim2.new(0, 15, 0, 110)
@@ -3009,11 +3723,11 @@ selectedText.TextSize = 12
 selectedText.TextXAlignment = Enum.TextXAlignment.Left
 selectedText.ZIndex = 6
 
-local function refreshSelectedLabel()
+function refreshSelectedLabel()
 	selectedText.Text = "Selected: " .. (Config.SelectedConfig ~= "" and Config.SelectedConfig or "None")
 end
 
-local function refreshConfigList()
+function refreshConfigList()
 	for _, c in ipairs(configList:GetChildren()) do
 		if c:IsA("TextButton") then
 			c:Destroy()
