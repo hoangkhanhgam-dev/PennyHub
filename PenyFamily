@@ -9,8 +9,8 @@ task.wait(5)
 
 repeat task.wait() until game:IsLoaded()
 
-local __pennyPlayers = game:GetService("Players")
-local __pennyLocalPlayer = __pennyPlayers.LocalPlayer
+__pennyPlayers = game:GetService("Players")
+__pennyLocalPlayer = __pennyPlayers.LocalPlayer
 
 repeat task.wait() until __pennyLocalPlayer
 repeat task.wait() until __pennyLocalPlayer:FindFirstChild("PlayerGui")
@@ -32,6 +32,7 @@ end
 
 task.wait(1)
 
+getgenv().PennyHubRegisterFixApplied = true
 print("[PennyHub] Start delay done -> loading hub")
 
 
@@ -40,30 +41,30 @@ print("[PennyHub] Start delay done -> loading hub")
 --// Phím ẩn/hiện menu: RightShift
 
 --// SERVICES
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+Players = game:GetService("Players")
+player = Players.LocalPlayer
+UIS = game:GetService("UserInputService")
+TweenService = game:GetService("TweenService")
+HttpService = game:GetService("HttpService")
+RunService = game:GetService("RunService")
+TeleportService = game:GetService("TeleportService")
+VirtualInputManager = game:GetService("VirtualInputManager")
 
-local http_request = (syn and syn.request) or (http and http.request) or request
+http_request = (syn and syn.request) or (http and http.request) or request
 
 --// CONFIG
-local TOGGLE_KEY = Enum.KeyCode.RightShift
-local BACKUP_TOGGLE_KEY = Enum.KeyCode.LeftAlt
+TOGGLE_KEY = Enum.KeyCode.RightShift
+BACKUP_TOGGLE_KEY = Enum.KeyCode.LeftAlt
 
-local ThemeMain = Color3.fromRGB(200, 210, 230)
-local ThemeGlow = Color3.fromRGB(225, 235, 255)
-local Dark = Color3.fromRGB(8, 10, 16)
+ThemeMain = Color3.fromRGB(200, 210, 230)
+ThemeGlow = Color3.fromRGB(225, 235, 255)
+Dark = Color3.fromRGB(8, 10, 16)
 
-local WORKSPACE_FOLDER = "PennyHubWorkspace"
-local CONFIG_INDEX_FILE = WORKSPACE_FOLDER .. "/config.json"
-local CONFIG_FOLDER = WORKSPACE_FOLDER .. "/configs"
+WORKSPACE_FOLDER = "PennyHubWorkspace"
+CONFIG_INDEX_FILE = WORKSPACE_FOLDER .. "/config.json"
+CONFIG_FOLDER = WORKSPACE_FOLDER .. "/configs"
 
-local Config = {
+Config = {
 	AfkArenaAuto = false,
 	AutoGetAfkReward = false,
 	AutoDropSam = false,
@@ -111,6 +112,8 @@ local Config = {
 	AutoSpawnUIStable = 1,
 	AutoSpawnScriptDelay = 4,
 
+	ShowCompassCounter = false,
+
 	WebhookEnabled = false,
 	WebhookURL = "",
 	DiscordID = "",
@@ -126,16 +129,16 @@ local Config = {
 	LastConfigName = "1"
 }
 
-local AFK_CONFIG = {
+AFK_CONFIG = {
 	AFK_PLACE_ID = 119985296453597,
 	USERNAME = "Penny Hub Notifier",
 	COOLDOWN = 3,
 	USE_TXT_BOX = true
 }
 
-local lastSentTime = 0
-local afkRunning = false
-local lastRewards = {
+lastSentTime = 0
+afkRunning = false
+lastRewards = {
 	Beri = 0,
 	Gem = 0,
 	Compass = 0,
@@ -143,15 +146,15 @@ local lastRewards = {
 	GoldenCompass = 0
 }
 
-local configButtons = {}
-local refreshers = {}
+configButtons = {}
+refreshers = {}
 
 --// FILE SYSTEM
-local function fsReady()
+function fsReady()
 	return isfolder and makefolder and isfile and writefile and readfile and listfiles
 end
 
-local function ensureWorkspace()
+function ensureWorkspace()
 	if not fsReady() then
 		warn("[PennyHub] Executor không hỗ trợ file system đầy đủ.")
 		return false
@@ -172,14 +175,14 @@ local function ensureWorkspace()
 	return true
 end
 
-local function safeEncode(tbl)
+function safeEncode(tbl)
 	local ok, result = pcall(function()
 		return HttpService:JSONEncode(tbl)
 	end)
 	return ok and result or "{}"
 end
 
-local function safeDecode(raw)
+function safeDecode(raw)
 	local ok, result = pcall(function()
 		return HttpService:JSONDecode(raw)
 	end)
@@ -189,7 +192,7 @@ local function safeDecode(raw)
 	return nil
 end
 
-local function applyTableToConfig(data)
+function applyTableToConfig(data)
 	if type(data) ~= "table" then return end
 	for k, v in pairs(data) do
 		if Config[k] ~= nil then
@@ -198,13 +201,13 @@ local function applyTableToConfig(data)
 	end
 end
 
-local function saveIndexConfig()
+function saveIndexConfig()
 	if not ensureWorkspace() then return false end
 	writefile(CONFIG_INDEX_FILE, safeEncode(Config))
 	return true
 end
 
-local function loadIndexConfig()
+function loadIndexConfig()
 	if not ensureWorkspace() then return false end
 	if not isfile(CONFIG_INDEX_FILE) then return false end
 
@@ -215,7 +218,7 @@ local function loadIndexConfig()
 	return true
 end
 
-local function sanitizeConfigName(name)
+function sanitizeConfigName(name)
 	name = tostring(name or ""):gsub("^%s+", ""):gsub("%s+$", "")
 	name = name:gsub("[\\/:*?\"<>|]", "_")
 	if name == "" then
@@ -224,12 +227,12 @@ local function sanitizeConfigName(name)
 	return name
 end
 
-local function configPath(name)
+function configPath(name)
 	name = sanitizeConfigName(name)
 	return CONFIG_FOLDER .. "/" .. name .. ".json"
 end
 
-local function listConfigNames()
+function listConfigNames()
 	if not ensureWorkspace() then return {} end
 
 	local names = {}
@@ -249,7 +252,7 @@ local function listConfigNames()
 	return names
 end
 
-local function createConfig(name)
+function createConfig(name)
 	if not ensureWorkspace() then return false end
 
 	name = sanitizeConfigName(name)
@@ -265,7 +268,7 @@ local function createConfig(name)
 	return true
 end
 
-local function saveSelectedConfig()
+function saveSelectedConfig()
 	if not ensureWorkspace() then return false end
 
 	local name = Config.SelectedConfig
@@ -279,7 +282,7 @@ local function saveSelectedConfig()
 	return true
 end
 
-local function loadSelectedConfig()
+function loadSelectedConfig()
 	if not ensureWorkspace() then return false end
 	local name = Config.SelectedConfig
 	if name == "" then return false end
@@ -296,7 +299,7 @@ local function loadSelectedConfig()
 	return true
 end
 
-local function deleteSelectedConfig()
+function deleteSelectedConfig()
 	if not ensureWorkspace() then return false end
 	local name = Config.SelectedConfig
 	if name == "" then return false end
@@ -388,6 +391,7 @@ do
 		Config.AutoSpawnRespawnDelay = tonumber(Config.AutoSpawnRespawnDelay) or 3.5
 		Config.AutoSpawnUIStable = tonumber(Config.AutoSpawnUIStable) or 1
 		Config.AutoSpawnScriptDelay = tonumber(Config.AutoSpawnScriptDelay) or 4
+		Config.ShowCompassCounter = startupData and startupData.ShowCompassCounter == true or false
 		Config.WebhookEnabled = false
 		Config.WebhookURL = ""
 		Config.DiscordID = ""
@@ -432,8 +436,8 @@ if not gui.Parent then
 	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
-local PRO_ZINDEX_BOOST = 1000
-local function forceTopLayer(root)
+PRO_ZINDEX_BOOST = 1000
+function forceTopLayer(root)
 	for _, v in ipairs(root:GetDescendants()) do
 		if v:IsA("GuiObject") and v.ZIndex < PRO_ZINDEX_BOOST then
 			v.ZIndex = v.ZIndex + PRO_ZINDEX_BOOST
@@ -635,7 +639,7 @@ content.BackgroundTransparency = 0.55
 content.ZIndex = 3
 
 -- outside quick menu button
-local isOpen = true
+isOpen = true
 
 -- OPEN HUB cũ được giữ dạng ẩn để không phá luồng cũ, nhưng sẽ không hiện nữa.
 openBtn = Instance.new("TextButton")
@@ -707,7 +711,7 @@ shadowScale = Instance.new("UIScale")
 shadowScale.Parent = quickShadow
 shadowScale.Scale = 1
 
-local function syncQuickShadow()
+function syncQuickShadow()
     quickShadow.Position = UDim2.new(
         quickToggleBtn.Position.X.Scale,
         quickToggleBtn.Position.X.Offset - 8,
@@ -770,7 +774,7 @@ quickToggleBtn.MouseLeave:Connect(function()
     }):Play()
 end)
 
-local function animateOpen()
+function animateOpen()
 	openBtn.Visible = false
 	main.Visible = true
 	main.Size = UDim2.new(0, 760, 0, 460)
@@ -784,7 +788,7 @@ local function animateOpen()
 	}):Play()
 end
 
-local function animateClose()
+function animateClose()
 	local tween = TweenService:Create(main, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {
 		Size = UDim2.new(0, 760, 0, 460),
 		Position = UDim2.new(0.5, -380, 0.5, -230),
@@ -800,7 +804,7 @@ local function animateClose()
 	end)
 end
 
-local function toggleUI()
+function toggleUI()
 	isOpen = not isOpen
 	if isOpen then
 		animateOpen()
@@ -813,10 +817,10 @@ close.MouseButton1Click:Connect(toggleUI)
 openBtn.MouseButton1Click:Connect(toggleUI)
 
 -- quick toggle button can be dragged; click only toggles if it was not dragged
-local quickDragging = false
-local quickMoved = false
-local quickStartPos = nil
-local quickStartButtonPos = nil
+quickDragging = false
+quickMoved = false
+quickStartPos = nil
+quickStartButtonPos = nil
 
 quickToggleBtn.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -864,7 +868,7 @@ UIS.InputBegan:Connect(function(input, gpe)
 end)
 
 -- drag
-local dragging = false
+dragging = false
 local startPos, startFrame
 
 topbar.InputBegan:Connect(function(input)
@@ -894,10 +898,10 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --// UI HELPERS
-local pages = {}
-local buttons = {}
+pages = {}
+buttons = {}
 
-local function updateScrollCanvas(page, extra)
+function updateScrollCanvas(page, extra)
 	if not page or not page:IsA("ScrollingFrame") then return end
 	extra = extra or 50
 
@@ -914,7 +918,7 @@ local function updateScrollCanvas(page, extra)
 	page.CanvasSize = UDim2.new(0, 0, 0, math.max(page.AbsoluteSize.Y + 1, maxY + extra))
 end
 
-local function createTab(name, index)
+function createTab(name, index)
 	local btn = Instance.new("TextButton")
 	btn.Parent = sidebar
 	btn.Size = UDim2.new(1, -20, 0, 40)
@@ -998,7 +1002,7 @@ local function createTab(name, index)
 	return page
 end
 
-local function card(parent, text, x, y, w, h)
+function card(parent, text, x, y, w, h)
 	w = w or 320
 	h = h or 140
 
@@ -1032,7 +1036,7 @@ local function card(parent, text, x, y, w, h)
 	return f
 end
 
-local function label(parent, text, x, y, w, h)
+function label(parent, text, x, y, w, h)
 	local l = Instance.new("TextLabel")
 	l.Parent = parent
 	l.Size = UDim2.new(0, w or 240, 0, h or 22)
@@ -1047,7 +1051,7 @@ local function label(parent, text, x, y, w, h)
 	return l
 end
 
-local function textbox(parent, placeholder, x, y, w, h, getValue, setValue, hideWhenNotFocused)
+function textbox(parent, placeholder, x, y, w, h, getValue, setValue, hideWhenNotFocused)
 	local tb = Instance.new("TextBox")
 	tb.Parent = parent
 	tb.Size = UDim2.new(0, w, 0, h or 32)
@@ -1097,7 +1101,7 @@ local function textbox(parent, placeholder, x, y, w, h, getValue, setValue, hide
 	return tb
 end
 
-local function button(parent, text, x, y, w, h, callback)
+function button(parent, text, x, y, w, h, callback)
 	local b = Instance.new("TextButton")
 	b.Parent = parent
 	b.Size = UDim2.new(0, w, 0, h or 34)
@@ -1135,7 +1139,7 @@ local function button(parent, text, x, y, w, h, callback)
 	return b
 end
 
-local function toggle(parent, key, text, x, y, w, h, callback)
+function toggle(parent, key, text, x, y, w, h, callback)
 	w = w or 260
 	h = h or 40
 
@@ -1232,19 +1236,138 @@ local function toggle(parent, key, text, x, y, w, h, callback)
 	return container
 end
 
-local function refreshAll()
+function refreshAll()
 	for _, fn in pairs(refreshers) do
 		pcall(fn)
 	end
 end
 
+
+--// COMPASS COUNTER UI
+compassCounterGui = nil
+compassCounterText = nil
+compassCounterRunning = false
+
+function countInventoryToolExact(toolName)
+	local count = 0
+	toolName = tostring(toolName or ""):lower()
+
+	local function scan(container)
+		if not container then return end
+		for _, v in ipairs(container:GetChildren()) do
+			if v:IsA("Tool") and tostring(v.Name):lower() == toolName then
+				count += 1
+			end
+		end
+	end
+
+	scan(player:FindFirstChild("Backpack"))
+	scan(player.Character)
+	return count
+end
+
+function updateCompassCounterText()
+	if not compassCounterText then return end
+	compassCounterText.Text =
+		"Compass: " .. countInventoryToolExact("Compass") ..
+		"\nSilver Compass: " .. countInventoryToolExact("Silver Compass") ..
+		"\nGolden Compass: " .. countInventoryToolExact("Golden Compass")
+end
+
+function destroyCompassCounter()
+	if compassCounterGui then
+		compassCounterGui:Destroy()
+		compassCounterGui = nil
+	end
+	compassCounterText = nil
+	compassCounterRunning = false
+end
+
+function createCompassCounter()
+	if compassCounterGui and compassCounterGui.Parent then
+		compassCounterGui.Enabled = true
+		return
+	end
+
+	local parentGui = player:WaitForChild("PlayerGui")
+
+	compassCounterGui = Instance.new("ScreenGui")
+	compassCounterGui.Name = "PennyCompassCounterUI"
+	compassCounterGui.ResetOnSpawn = false
+	compassCounterGui.DisplayOrder = 999998
+	compassCounterGui.IgnoreGuiInset = true
+	compassCounterGui.Parent = parentGui
+
+	local frame = Instance.new("Frame")
+	frame.Parent = compassCounterGui
+	frame.Size = UDim2.new(0, 150, 0, 55)
+	frame.AnchorPoint = Vector2.new(0, 0.5)
+	frame.Position = UDim2.new(0, 15, 0.5, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
+	frame.BackgroundTransparency = 0.15
+	frame.BorderSizePixel = 0
+	frame.ZIndex = 50
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Parent = frame
+	stroke.Color = ThemeMain
+	stroke.Transparency = 0.75
+
+	compassCounterText = Instance.new("TextLabel")
+	compassCounterText.Parent = frame
+	compassCounterText.Size = UDim2.new(1, -10, 1, -8)
+	compassCounterText.Position = UDim2.new(0, 7, 0, 5)
+	compassCounterText.BackgroundTransparency = 1
+	compassCounterText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	compassCounterText.TextXAlignment = Enum.TextXAlignment.Left
+	compassCounterText.TextYAlignment = Enum.TextYAlignment.Top
+	compassCounterText.Font = Enum.Font.GothamBold
+	compassCounterText.TextSize = 11
+	compassCounterText.TextWrapped = false
+	compassCounterText.ZIndex = 51
+
+	updateCompassCounterText()
+end
+
+function runCompassCounter()
+	if compassCounterRunning then return end
+	compassCounterRunning = true
+
+	task.spawn(function()
+		while Config.ShowCompassCounter do
+			if not compassCounterGui or not compassCounterGui.Parent then
+				createCompassCounter()
+			end
+
+			updateCompassCounterText()
+			task.wait(0.3)
+		end
+
+		destroyCompassCounter()
+	end)
+end
+
+function setCompassCounter(state)
+	Config.ShowCompassCounter = state == true
+	saveIndexConfig()
+
+	if Config.ShowCompassCounter then
+		createCompassCounter()
+		runCompassCounter()
+	else
+		destroyCompassCounter()
+	end
+end
+
+
 --// AFK WEBHOOK LOGIC
-local function parseNumber(s)
+function parseNumber(s)
 	if not s then return nil end
 	return tonumber((s:gsub("[,%s]", "")))
 end
 
-local function ensureAfkPlace()
+function ensureAfkPlace()
 	if game.PlaceId == AFK_CONFIG.AFK_PLACE_ID then return true end
 	pcall(function()
 		TeleportService:Teleport(AFK_CONFIG.AFK_PLACE_ID, player)
@@ -1252,7 +1375,7 @@ local function ensureAfkPlace()
 	return false
 end
 
-local function sendWebhook(lines, ping)
+function sendWebhook(lines, ping)
 	if not Config.WebhookEnabled then
 		warn("[PennyHub] Webhook đang OFF.")
 		return false
@@ -1322,7 +1445,7 @@ local function sendWebhook(lines, ping)
 	return true
 end
 
-local function scanRewards(afkUi)
+function scanRewards(afkUi)
 	local v = {
 		Beri = nil,
 		Gem = nil,
@@ -1352,11 +1475,11 @@ local function scanRewards(afkUi)
 	return v
 end
 
-local function stopAfk()
+function stopAfk()
 	afkRunning = false
 end
 
-local function startAfk()
+function startAfk()
 	if afkRunning then return end
 	afkRunning = true
 
@@ -1419,50 +1542,50 @@ end
 
 
 --// AUTO GET AFK REWARD + AUTO DROP SAM
-local DROP_POSITIONS = {
+DROP_POSITIONS = {
 	Compass = Vector3.new(-1359, 230, -1577),
 	SilverCompass = Vector3.new(-1272, 230, -1562),
 	GoldenCompass = Vector3.new(-1282, 219, -1341)
 }
 
-local autoRewardRunning = false
-local autoDropRunning = false
-local autoPickCompassRunning = false
-local autoDropAmountRunning = false
-local autoDropDrinkRunning = false
-local autoBuyDrinkRunning = false
-local autoUseDrinkRunning = false
-local autoChangeNoAfkRewardsRunning = false
+autoRewardRunning = false
+autoDropRunning = false
+autoPickCompassRunning = false
+autoDropAmountRunning = false
+autoDropDrinkRunning = false
+autoBuyDrinkRunning = false
+autoUseDrinkRunning = false
+autoChangeNoAfkRewardsRunning = false
 local floatBV, floatBG
-local floatActive = false
-local actionBusy = false
-local actionToken = 0
+floatActive = false
+actionBusy = false
+actionToken = 0
 
-local function waitActionFree()
+function waitActionFree()
 	while actionBusy do
 		task.wait(0.1)
 	end
 	actionBusy = true
 end
 
-local function releaseAction()
+function releaseAction()
 	actionBusy = false
 end
 
 --// CHARACTER READY GUARD
 -- Các auto khác chỉ được chạy khi nhân vật đã spawn thật sự và đã qua delay ổn định.
 -- Auto Spawn vẫn được phép chạy riêng để đưa nhân vật vào game.
-local characterReadyAt = 0
+characterReadyAt = 0
 
-local function getAutoSpawnScriptDelay()
+function getAutoSpawnScriptDelay()
 	return math.clamp(tonumber(Config.AutoSpawnScriptDelay) or 4, 0, 15)
 end
 
-local function markCharacterNotReady()
+function markCharacterNotReady()
 	characterReadyAt = math.huge
 end
 
-local function markCharacterReadyAfterDelay()
+function markCharacterReadyAfterDelay()
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum and hum.Health > 0 then
@@ -1472,7 +1595,7 @@ local function markCharacterReadyAfterDelay()
 	end
 end
 
-local function isCharacterReady()
+function isCharacterReady()
 	local char = player.Character
 	if not char then return false end
 
@@ -1486,7 +1609,7 @@ local function isCharacterReady()
 	return true
 end
 
-local function waitUntilCharacterReady()
+function waitUntilCharacterReady()
 	while gui.Parent and not isCharacterReady() do
 		task.wait(0.2)
 	end
@@ -1494,7 +1617,7 @@ local function waitUntilCharacterReady()
 	return isCharacterReady()
 end
 
-local function getChar()
+function getChar()
 	if not waitUntilCharacterReady() then
 		return nil, nil, nil
 	end
@@ -1506,8 +1629,8 @@ local function getChar()
 	return char, hrp, hum
 end
 
-local guardedCharacters = {}
-local function hookCharacterReadyGuard(char)
+guardedCharacters = {}
+function hookCharacterReadyGuard(char)
 	if not char or guardedCharacters[char] then return end
 	guardedCharacters[char] = true
 	markCharacterNotReady()
@@ -1535,7 +1658,7 @@ player.CharacterAdded:Connect(function(char)
 	hookCharacterReadyGuard(char)
 end)
 
-local function startFloat()
+function startFloat()
 	if not isCharacterReady() then return false end
 
 	local char, hrp, hum = getChar()
@@ -1569,7 +1692,7 @@ local function startFloat()
 	return true
 end
 
-local function forceStopFloat()
+function forceStopFloat()
 	-- Chỉ reset đúng 1 lần khi vừa tắt auto.
 	-- Nếu spam ChangeState mỗi frame thì nhân vật sẽ bị khựng, rơi chậm, nhảy không cao.
 	local needReset = floatActive or floatBV ~= nil or floatBG ~= nil
@@ -1627,10 +1750,10 @@ end
 
 --// DROP PIN + NOCLIP
 -- Giữ nhân vật đứng yên đúng điểm drop, hạn chế bị player khác đẩy ra chỗ quái.
-local dropPinConn = nil
-local dropNoClipBackup = {}
+dropPinConn = nil
+dropNoClipBackup = {}
 
-local function setDropNoClip(enabled)
+function setDropNoClip(enabled)
 	local char = player.Character
 	if not char then return end
 
@@ -1654,7 +1777,7 @@ local function setDropNoClip(enabled)
 	end
 end
 
-local function stopDropPin()
+function stopDropPin()
 	if dropPinConn then
 		dropPinConn:Disconnect()
 		dropPinConn = nil
@@ -1663,7 +1786,7 @@ local function stopDropPin()
 	setDropNoClip(false)
 end
 
-local function startDropPin(pinPos, token)
+function startDropPin(pinPos, token)
 	if not Config.DropPinEnabled then return end
 
 	stopDropPin()
@@ -1722,14 +1845,14 @@ local function startDropPin(pinPos, token)
 end
 
 
-local function stopFloatIfIdle()
+function stopFloatIfIdle()
 	if Config.AutoGetAfkReward or Config.AutoDropSam or Config.AutoPickCompass or Config.AutoDropCompassAmount or Config.AutoDropDrinkAmount or Config.AutoBuyDrinkAmount or Config.AutoUseDrinkAmount or Config.AutoChangeNoAfkRewards or Config.AutoBuyDrinkAmount then return end
 	if floatActive or floatBV or floatBG then
 		forceStopFloat()
 	end
 end
 
-local function cancelCurrentAutoMove()
+function cancelCurrentAutoMove()
 	actionToken += 1
 	stopDropPin()
 	if not Config.AutoGetAfkReward and not Config.AutoDropSam and not Config.AutoPickCompass and not Config.AutoDropCompassAmount and not Config.AutoDropDrinkAmount and not Config.AutoBuyDrinkAmount and not Config.AutoUseDrinkAmount and not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then
@@ -1763,7 +1886,7 @@ task.spawn(function()
 	end
 end)
 
-local function flyTo(pos, token)
+function flyTo(pos, token)
 	token = token or actionToken
 	if not isCharacterReady() then
 		forceStopFloat()
@@ -1803,11 +1926,11 @@ local function flyTo(pos, token)
 	return true
 end
 
-local function getAfkNpc()
+function getAfkNpc()
 	return workspace:WaitForChild("Merchants"):WaitForChild("AFK_NPC")
 end
 
-local function getNpcPart(npc)
+function getNpcPart(npc)
 	if npc:IsA("BasePart") then return npc end
 	return npc:FindFirstChild("HumanoidRootPart")
 		or npc:FindFirstChild("Clickable")
@@ -1815,7 +1938,7 @@ local function getNpcPart(npc)
 		or npc:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function openAfkNpc()
+function openAfkNpc()
 	local npc = getAfkNpc()
 
 	local clickDetector = npc:FindFirstChildWhichIsA("ClickDetector", true)
@@ -1836,14 +1959,14 @@ local function openAfkNpc()
 	return false
 end
 
-local function claimAfkReward()
+function claimAfkReward()
 	local npc = getAfkNpc()
 	local remote = npc:WaitForChild("Clickable"):WaitForChild("Remote")
 	remote:FireServer("Claim")
 	print("[PennyHub] Claimed AFK Reward")
 end
 
-local function itemMatch(name, typeName)
+function itemMatch(name, typeName)
 	name = string.lower(tostring(name or ""))
 
 	if typeName == "Compass" then
@@ -1865,7 +1988,7 @@ local function itemMatch(name, typeName)
 	return false
 end
 
-local function getTools(typeName)
+function getTools(typeName)
 	local tools = {}
 
 	local function scan(container)
@@ -1884,11 +2007,11 @@ local function getTools(typeName)
 	return tools
 end
 
-local function hasAnySamTool()
+function hasAnySamTool()
 	return #getTools("Compass") > 0 or #getTools("SilverCompass") > 0 or #getTools("GoldenCompass") > 0
 end
 
-local function pressBackspace()
+function pressBackspace()
 	for i = 1, 3 do
 		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
 		task.wait(0.02)
@@ -1897,7 +2020,7 @@ local function pressBackspace()
 	end
 end
 
-local function dropTool(tool)
+function dropTool(tool)
 	if not isCharacterReady() then return end
 
 	local char, hrp, hum = getChar()
@@ -1914,7 +2037,7 @@ local function dropTool(tool)
 	task.wait(0.08)
 end
 
-local function dropAll(typeName, pos, token)
+function dropAll(typeName, pos, token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoDropSam then return end
 
@@ -1963,7 +2086,7 @@ local function dropAll(typeName, pos, token)
 	stopDropPin()
 end
 
-local function doGetAfkRewardOnce(token)
+function doGetAfkRewardOnce(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoGetAfkReward then return end
 	if not isCharacterReady() then return end
@@ -1993,7 +2116,7 @@ local function doGetAfkRewardOnce(token)
 	end
 end
 
-local function doDropSamOnce(token)
+function doDropSamOnce(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoDropSam then return end
 	if not isCharacterReady() then return end
@@ -2015,17 +2138,17 @@ end
 
 --// AUTO PICK COMPASS SERVER
 -- Tự tìm object có CompassServer trong workspace:GetChildren(), ưu tiên cái gần nhất rồi tween tới nhặt.
-local function getAutoPickCompassSpeed()
+function getAutoPickCompassSpeed()
 	local n = tonumber(Config.AutoPickCompassSpeed) or 250
 	return math.clamp(n, 50, 1500)
 end
 
-local function getAutoPickCompassDelay()
+function getAutoPickCompassDelay()
 	local n = tonumber(Config.AutoPickCompassDelay) or 0.25
 	return math.clamp(n, 0.05, 3)
 end
 
-local function getCompassServerPart(obj)
+function getCompassServerPart(obj)
 	if not obj then return nil end
 
 	local compassServer = obj:FindFirstChild("CompassServer")
@@ -2045,7 +2168,7 @@ local function getCompassServerPart(obj)
 	return obj:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function findNearestCompassServer()
+function findNearestCompassServer()
 	local char, hrp = getChar()
 	if not char or not hrp then return nil, nil, nil end
 
@@ -2070,7 +2193,7 @@ local function findNearestCompassServer()
 	return nearestObj, nearestPart, nearestDist
 end
 
-local function tweenToCompassPart(part, token)
+function tweenToCompassPart(part, token)
 	token = token or actionToken
 
 	if not isCharacterReady() then return false end
@@ -2105,7 +2228,7 @@ local function tweenToCompassPart(part, token)
 	return true
 end
 
-local function pickCompassServer(obj, part)
+function pickCompassServer(obj, part)
 	local char, hrp = getChar()
 	if not char or not hrp or not part then return end
 
@@ -2130,7 +2253,7 @@ local function pickCompassServer(obj, part)
 	end
 end
 
-local function runAutoPickCompass()
+function runAutoPickCompass()
 	if autoPickCompassRunning then return end
 	autoPickCompassRunning = true
 
@@ -2181,14 +2304,14 @@ end
 --// AUTO DROP COMPASS BY AMOUNT
 -- Drop theo số lượng, không bay tới vị trí cố định, không ghim vị trí.
 -- Nó sẽ drop ngay tại chỗ nhân vật đang đứng, nên vẫn có thể di chuyển tự do.
-local function getDropAmountValue(key)
+function getDropAmountValue(key)
 	local n = tonumber(Config[key]) or 0
 	n = math.floor(n)
 	if n < 0 then n = 0 end
 	return n
 end
 
-local function dropSomeTools(typeName, amount)
+function dropSomeTools(typeName, amount)
 	if not isCharacterReady() then return 0 end
 
 	amount = math.floor(tonumber(amount) or 0)
@@ -2211,7 +2334,7 @@ local function dropSomeTools(typeName, amount)
 	return dropped
 end
 
-local function doDropCompassAmountOnce()
+function doDropCompassAmountOnce()
 	if not Config.AutoDropCompassAmount then return end
 	if not isCharacterReady() then return end
 
@@ -2235,7 +2358,7 @@ local function doDropCompassAmountOnce()
 	end
 end
 
-local function runAutoDropCompassAmount()
+function runAutoDropCompassAmount()
 	if autoDropAmountRunning then return end
 	autoDropAmountRunning = true
 
@@ -2278,7 +2401,7 @@ end
 --// AUTO DROP DRINK BY AMOUNT
 -- Drop theo số lượng các ly nước: Cider / Lemonade / Juice / Smoothie.
 -- Bỏ qua Melee. Drop ngay tại chỗ đang đứng, không bay, không ghim vị trí.
-local function dropSomeDrinkTools(typeName, amount)
+function dropSomeDrinkTools(typeName, amount)
 	if not isCharacterReady() then return 0 end
 
 	amount = math.floor(tonumber(amount) or 0)
@@ -2301,7 +2424,7 @@ local function dropSomeDrinkTools(typeName, amount)
 	return dropped
 end
 
-local function doDropDrinkAmountOnce()
+function doDropDrinkAmountOnce()
 	if not Config.AutoDropDrinkAmount then return end
 	if not isCharacterReady() then return end
 
@@ -2331,7 +2454,7 @@ local function doDropDrinkAmountOnce()
 	end
 end
 
-local function runAutoDropDrinkAmount()
+function runAutoDropDrinkAmount()
 	if autoDropDrinkRunning then return end
 	autoDropDrinkRunning = true
 
@@ -2373,16 +2496,16 @@ end
 --// AUTO BUY DRINK BY AMOUNT
 -- Mua Cider+ / Lemonade+ / Juice+ / Smoothie+ theo số lượng.
 -- Cơ chế mới: bay tới BetterDrinkMerchant, mở shop, rồi CLICK UI thật để mua.
-local function getBuyDrinkDelay()
+function getBuyDrinkDelay()
 	local n = tonumber(Config.BuyDrinkDelay) or 0.2
 	return math.clamp(n, 0.08, 5)
 end
 
-local function getDrinkMerchant()
+function getDrinkMerchant()
 	return workspace:WaitForChild("Merchants"):WaitForChild("BetterDrinkMerchant")
 end
 
-local function openDrinkMerchant()
+function openDrinkMerchant()
 	local npc = getDrinkMerchant()
 
 	local clickDetector = npc:FindFirstChildWhichIsA("ClickDetector", true)
@@ -2403,7 +2526,7 @@ local function openDrinkMerchant()
 	return false
 end
 
-local function goToDrinkMerchant(token)
+function goToDrinkMerchant(token)
 	token = token or actionToken
 
 	if not isCharacterReady() then return false end
@@ -2438,7 +2561,7 @@ local function goToDrinkMerchant(token)
 	return true
 end
 
-local function isGuiReallyVisible(obj)
+function isGuiReallyVisible(obj)
 	if not obj or not obj:IsA("GuiObject") then return false end
 	if not obj.Visible then return false end
 
@@ -2453,7 +2576,7 @@ local function isGuiReallyVisible(obj)
 	return true
 end
 
-local function getTextOfGui(obj)
+function getTextOfGui(obj)
 	if not obj then return "" end
 
 	if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
@@ -2463,7 +2586,7 @@ local function getTextOfGui(obj)
 	return ""
 end
 
-local function findClickableAncestor(obj)
+function findClickableAncestor(obj)
 	local cur = obj
 
 	for i = 1, 8 do
@@ -2479,7 +2602,7 @@ local function findClickableAncestor(obj)
 	return nil
 end
 
-local function findDrinkClickTarget(drinkName)
+function findDrinkClickTarget(drinkName)
 	local pg = player:FindFirstChild("PlayerGui")
 	if not pg then return nil end
 
@@ -2517,7 +2640,7 @@ local function findDrinkClickTarget(drinkName)
 	return nil
 end
 
-local function clickGuiObject(obj)
+function clickGuiObject(obj)
 	if not obj or not obj:IsA("GuiObject") then return false end
 
 	local clicked = false
@@ -2569,7 +2692,7 @@ local function clickGuiObject(obj)
 	return clicked
 end
 
-local function clickDrinkUI(drinkName)
+function clickDrinkUI(drinkName)
 	local target = findDrinkClickTarget(drinkName)
 
 	if not target then
@@ -2581,7 +2704,7 @@ local function clickDrinkUI(drinkName)
 	return clickGuiObject(target)
 end
 
-local function buyDrinkByClick(drinkName, amount, token)
+function buyDrinkByClick(drinkName, amount, token)
 	amount = math.floor(tonumber(amount) or 0)
 	if amount <= 0 then return 0 end
 
@@ -2611,7 +2734,7 @@ local function buyDrinkByClick(drinkName, amount, token)
 	return bought
 end
 
-local function doBuyDrinkAmountOnce(token)
+function doBuyDrinkAmountOnce(token)
 	if not Config.AutoBuyDrinkAmount then return end
 	if not isCharacterReady() then return end
 
@@ -2649,7 +2772,7 @@ local function doBuyDrinkAmountOnce(token)
 	end
 end
 
-local function runAutoBuyDrinkAmount()
+function runAutoBuyDrinkAmount()
 	if autoBuyDrinkRunning then return end
 	autoBuyDrinkRunning = true
 
@@ -2697,14 +2820,14 @@ end
 --// AUTO USE DRINK BY AMOUNT
 -- Uống Cider / Lemonade / Juice / Smoothie theo số lượng.
 -- Bản nhanh: đánh dấu tool đã uống để không click lặp lại tool cũ, không cần đợi tool biến mất.
-local usedDrinkCache = {}
+usedDrinkCache = {}
 
-local function getUseDrinkDelay()
+function getUseDrinkDelay()
 	local n = tonumber(Config.UseDrinkDelay) or 0.15
 	return math.clamp(n, 0.03, 3)
 end
 
-local function useDrinkToolFast(tool)
+function useDrinkToolFast(tool)
 	if not tool or not tool.Parent then return false end
 	if usedDrinkCache[tool] then return false end
 	if not isCharacterReady() then return false end
@@ -2729,7 +2852,7 @@ local function useDrinkToolFast(tool)
 	return true
 end
 
-local function useDrinkByAmount(typeName, amount)
+function useDrinkByAmount(typeName, amount)
 	if not isCharacterReady() then return 0 end
 
 	amount = math.floor(tonumber(amount) or 0)
@@ -2768,7 +2891,7 @@ local function useDrinkByAmount(typeName, amount)
 	return used
 end
 
-local function doUseDrinkAmountOnce()
+function doUseDrinkAmountOnce()
 	if not Config.AutoUseDrinkAmount then return end
 	if not isCharacterReady() then return end
 
@@ -2798,7 +2921,7 @@ local function doUseDrinkAmountOnce()
 	end
 end
 
-local function runAutoUseDrinkAmount()
+function runAutoUseDrinkAmount()
 	if autoUseDrinkRunning then return end
 	autoUseDrinkRunning = true
 
@@ -2841,7 +2964,7 @@ end
 --// AUTO CHANGE ACCOUNT AFTER DROP SAM EMPTY
 -- Không check UI AFK Reward nữa. Chỉ cần sau khi drop xong mà Backpack/Character
 -- không còn Compass/Silver/Golden Compass thì tạo file và kick để tool đổi acc.
-local function writeDoneAndKick(reason)
+function writeDoneAndKick(reason)
 	local username = player.Name
 	local wroteFile = false
 
@@ -2866,7 +2989,7 @@ local function writeDoneAndKick(reason)
 	player:Kick(reason or "Drop Sam completed")
 end
 
-local function changeAccountAfterDropSam(token)
+function changeAccountAfterDropSam(token)
 	token = token or actionToken
 	if token ~= actionToken or not Config.AutoChangeNoAfkRewards and not Config.AutoBuyDrinkAmount then return false end
 	if not isCharacterReady() then return false end
@@ -2883,7 +3006,7 @@ local function changeAccountAfterDropSam(token)
 	return true
 end
 
-local function runAutoChangeNoAfkRewards()
+function runAutoChangeNoAfkRewards()
 	if autoChangeNoAfkRewardsRunning then return end
 	autoChangeNoAfkRewardsRunning = true
 
@@ -2928,7 +3051,7 @@ local function runAutoChangeNoAfkRewards()
 	end)
 end
 
-local function runGetAfkReward()
+function runGetAfkReward()
 	if autoRewardRunning then return end
 	autoRewardRunning = true
 
@@ -2980,7 +3103,7 @@ local function runGetAfkReward()
 	end)
 end
 
-local function runAutoDropSam()
+function runAutoDropSam()
 	if autoDropRunning then return end
 	autoDropRunning = true
 
@@ -3033,18 +3156,18 @@ end
 
 
 --// AUTO GIFT BOX LOGIC
-local autoGemGiftBoxRunning = false
-local autoBeriGiftBoxRunning = false
+autoGemGiftBoxRunning = false
+autoBeriGiftBoxRunning = false
 
-local function getGiftBoxDelay()
+function getGiftBoxDelay()
 	return math.clamp(tonumber(Config.GiftBoxDelay) or 2.5, 1, 30)
 end
 
-local function getUserDataFolder()
+function getUserDataFolder()
 	return workspace:WaitForChild("UserData"):WaitForChild("User_" .. player.UserId)
 end
 
-local function fireRewardRemote(remoteName)
+function fireRewardRemote(remoteName)
 	local userFolder = getUserDataFolder()
 	local remote = userFolder:FindFirstChild(remoteName) or userFolder:WaitForChild(remoteName, 5)
 	if remote and remote.FireServer then
@@ -3056,7 +3179,7 @@ local function fireRewardRemote(remoteName)
 	return false
 end
 
-local function runAutoGemGiftBox()
+function runAutoGemGiftBox()
 	if autoGemGiftBoxRunning then return end
 	autoGemGiftBoxRunning = true
 
@@ -3072,7 +3195,7 @@ local function runAutoGemGiftBox()
 	end)
 end
 
-local function runAutoBeriGiftBox()
+function runAutoBeriGiftBox()
 	if autoBeriGiftBoxRunning then return end
 	autoBeriGiftBoxRunning = true
 
@@ -3090,20 +3213,20 @@ end
 
 
 --// AUTO WOOD ROD QUEST LOGIC
-local autoWoodRodQuestRunning = false
-local woodRodCachedNpcName = nil
+autoWoodRodQuestRunning = false
+woodRodCachedNpcName = nil
 
-local function getWoodRodTPDelay()
+function getWoodRodTPDelay()
 	return math.clamp(tonumber(Config.WoodRodTPDelay) or 2, 0.2, 10)
 end
 
-local function findWoodRodTool()
+function findWoodRodTool()
 	local char = player.Character
 	local backpack = player:FindFirstChild("Backpack")
 	return (char and char:FindFirstChild("Wood Rod")) or (backpack and backpack:FindFirstChild("Wood Rod"))
 end
 
-local function equipAnyTool(tool)
+function equipAnyTool(tool)
 	if not tool then return false end
 	local char, hrp, hum = getChar()
 	if not char or not hum then return false end
@@ -3114,7 +3237,7 @@ local function equipAnyTool(tool)
 	return true
 end
 
-local function tryUpdateWoodRod()
+function tryUpdateWoodRod()
 	pcall(function()
 		game:GetService("ReplicatedStorage")
 			:WaitForChild("Connections")
@@ -3153,20 +3276,20 @@ local function tryUpdateWoodRod()
 	return false
 end
 
-local function getPackageTool()
+function getPackageTool()
 	local char = player.Character
 	local backpack = player:FindFirstChild("Backpack")
 	return (char and char:FindFirstChild("Package")) or (backpack and backpack:FindFirstChild("Package"))
 end
 
-local function equipPackageTool()
+function equipPackageTool()
 	local pkg = getPackageTool()
 	if not pkg then return nil end
 	equipAnyTool(pkg)
 	return getPackageTool()
 end
 
-local function woodRodTp(pos)
+function woodRodTp(pos)
 	local char, hrp = getChar()
 	if not char or not hrp then return false end
 	hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -3176,7 +3299,7 @@ local function woodRodTp(pos)
 	return true
 end
 
-local function getWoodRodNpcPart(npc)
+function getWoodRodNpcPart(npc)
 	if not npc then return nil end
 	if npc:IsA("BasePart") then return npc end
 	return npc:FindFirstChild("HumanoidRootPart")
@@ -3185,7 +3308,7 @@ local function getWoodRodNpcPart(npc)
 		or npc:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function getWoodRodTouchPos(part)
+function getWoodRodTouchPos(part)
 	local char, hrp = getChar()
 	if not hrp or not part then return nil end
 
@@ -3199,7 +3322,7 @@ local function getWoodRodTouchPos(part)
 	return part.Position + dir * 0.8
 end
 
-local function pinWoodRodToNpc(part, duration)
+function pinWoodRodToNpc(part, duration)
 	local char, hrp = getChar()
 	if not hrp or not part then return end
 
@@ -3214,7 +3337,7 @@ local function pinWoodRodToNpc(part, duration)
 	end
 end
 
-local function getWoodRodQuest()
+function getWoodRodQuest()
 	local npc = workspace:WaitForChild("Merchants"):WaitForChild("QuestFishMerchant")
 	local part = getWoodRodNpcPart(npc)
 	if part then
@@ -3227,7 +3350,7 @@ local function getWoodRodQuest()
 	remote:FireServer("Close")
 end
 
-local function tryDeliverWoodRodPackageToNpc(npc)
+function tryDeliverWoodRodPackageToNpc(npc)
 	local part = getWoodRodNpcPart(npc)
 	if not part then return false end
 
@@ -3265,7 +3388,7 @@ local function tryDeliverWoodRodPackageToNpc(npc)
 	return false
 end
 
-local function getWoodRodNpcList()
+function getWoodRodNpcList()
 	local merchants = workspace:FindFirstChild("Merchants")
 	if not merchants then return {} end
 
@@ -3287,7 +3410,7 @@ local function getWoodRodNpcList()
 	return list
 end
 
-local function deliverWoodRodPackageByScan()
+function deliverWoodRodPackageByScan()
 	for _, npc in ipairs(getWoodRodNpcList()) do
 		if not Config.AutoWoodRodQuest then return false end
 		if not getPackageTool() then return true end
@@ -3301,7 +3424,7 @@ local function deliverWoodRodPackageByScan()
 	return not getPackageTool()
 end
 
-local function runAutoWoodRodQuest()
+function runAutoWoodRodQuest()
 	if autoWoodRodQuestRunning then return end
 	autoWoodRodQuestRunning = true
 
@@ -3337,19 +3460,19 @@ end
 
 
 --// AUTO SPAWN LOGIC
-local autoSpawnRunning = false
-local autoSpawnClickedLock = true
-local autoSpawnHookedChars = {}
+autoSpawnRunning = false
+autoSpawnClickedLock = true
+autoSpawnHookedChars = {}
 
-local function getAutoSpawnRespawnDelay()
+function getAutoSpawnRespawnDelay()
 	return math.clamp(tonumber(Config.AutoSpawnRespawnDelay) or 3.5, 0.5, 15)
 end
 
-local function getAutoSpawnUIStable()
+function getAutoSpawnUIStable()
 	return math.clamp(tonumber(Config.AutoSpawnUIStable) or 1, 0, 10)
 end
 
-local function findSpawnButton()
+function findSpawnButton()
 	local pg = player:FindFirstChild("PlayerGui")
 	if not pg then return nil end
 
@@ -3362,7 +3485,7 @@ local function findSpawnButton()
 	return nil
 end
 
-local function isLoadFrameVisible()
+function isLoadFrameVisible()
 	local pg = player:FindFirstChild("PlayerGui")
 	if not pg then return false end
 
@@ -3372,7 +3495,7 @@ local function isLoadFrameVisible()
 	return frame and frame.Visible == true
 end
 
-local function hideSpawnUI()
+function hideSpawnUI()
 	local pg = player:FindFirstChild("PlayerGui")
 	if not pg then return end
 
@@ -3382,7 +3505,7 @@ local function hideSpawnUI()
 	end
 end
 
-local function fixAfterAutoSpawn()
+function fixAfterAutoSpawn()
 	task.spawn(function()
 		local char
 		local hum
@@ -3413,7 +3536,7 @@ local function fixAfterAutoSpawn()
 	end)
 end
 
-local function clickAutoSpawnButton(btn)
+function clickAutoSpawnButton(btn)
 	if not btn then return false end
 
 	if firesignal then
@@ -3434,7 +3557,7 @@ local function clickAutoSpawnButton(btn)
 	return false
 end
 
-local function unlockAutoSpawnWhenUIReady()
+function unlockAutoSpawnWhenUIReady()
 	task.spawn(function()
 		autoSpawnClickedLock = true
 
@@ -3451,7 +3574,7 @@ local function unlockAutoSpawnWhenUIReady()
 	end)
 end
 
-local function hookAutoSpawnDeath(char)
+function hookAutoSpawnDeath(char)
 	if not char or autoSpawnHookedChars[char] then return end
 	autoSpawnHookedChars[char] = true
 
@@ -3467,7 +3590,7 @@ local function hookAutoSpawnDeath(char)
 	end)
 end
 
-local function runAutoSpawn()
+function runAutoSpawn()
 	if autoSpawnRunning then return end
 	autoSpawnRunning = true
 	autoSpawnClickedLock = true
@@ -3509,9 +3632,30 @@ player.CharacterAdded:Connect(function(char)
 end)
 
 --// BUILD TABS
-local mainTab = createTab("Main", 0)
-local farmingTab = createTab("Farming", 1)
-local settingTab = createTab("Setting", 2)
+mainTab = createTab("Main", 0)
+farmingTab = createTab("Farming", 1)
+teleportTab = createTab("Teleport", 2)
+settingTab = createTab("Setting", 3)
+
+
+--// TELEPORT LOGIC
+function teleportToIsland(pos)
+	if not pos then return end
+
+	local char = player.Character
+	if not char then return end
+
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	forceStopFloat()
+	stopDropPin()
+
+	hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+	hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+	hrp.CFrame = CFrame.new(pos + Vector3.new(0, 4, 0))
+end
+
 
 -- Main
 mainCard = card(mainTab, "Main", 20, 20, 560, 520)
@@ -3927,6 +4071,64 @@ label(useDrinkMainCard, "Bản nhanh: không uống lặp lại cùng một ly."
 label(useDrinkMainCard, "Dùng đủ số lượng sẽ tự tắt.", 20, 320, 300, 24)
 
 
+
+-- Teleport
+islandTeleportCard = card(teleportTab, "Island Teleport", 20, 20, 560, 1030)
+
+islands = {
+	{"Sand Island", Vector3.new(-6, 216, -260)},
+	{"Cave Island", Vector3.new(-128, 216, -781)},
+	{"Sam Island", Vector3.new(-1278, 217, -1255)},
+	{"Fishing Island", Vector3.new(-1623, 217, -299)},
+	{"Marine Island", Vector3.new(-3135, 217, -3541)},
+	{"Pupple Island", Vector3.new(-5282, 535, -7764)},
+	{"Trees Island", Vector3.new(-6034, 402, -6)},
+	{"Road Island", Vector3.new(-6277, 216, 3347)},
+	{"Tiny Snow Island", Vector3.new(-1896, 225, 3299)},
+	{"Pyramids Island", Vector3.new(119, 229, 4858)},
+	{"Near Bar Island", Vector3.new(869, 269, 1219)},
+	{"Mini Island 1", Vector3.new(-40, 229, 2158)},
+	{"Krizima Island", Vector3.new(-1077, 361, 1693)},
+	{"Mini Island 2", Vector3.new(-1225, 227, 625)},
+	{"Unknow Island 1", Vector3.new(-2681, 253, 1050)},
+	{"Super Mini Island", Vector3.new(-4005, 216, -2190)},
+	{"Crab Island", Vector3.new(1157, 254, -223)},
+	{"Mini Island 3", Vector3.new(765, 216, -1373)},
+	{"Sand Castle Island", Vector3.new(830, 216, -3283)},
+	{"Boss Fruit Summon Island", Vector3.new(4828, 570, -7101)},
+	{"Big Snow Island", Vector3.new(6304, 541, -1333)},
+	{"Devil Island", Vector3.new(2056, 490, -675)},
+	{"LeaderBoard Island", Vector3.new(1786, 218, 897)},
+	{"Crescent Island", Vector3.new(2990, 217, 1438)},
+	{"Bar Island", Vector3.new(1505, 257, 2091)},
+	{"Unknow Island 2", Vector3.new(1124, 217, 3288)},
+	{"Vokun Island", Vector3.new(4582, 217, 4905)}
+}
+
+label(islandTeleportCard, "Click tên đảo để teleport. Vị trí sẽ cộng Y +4 để tránh kẹt đất.", 20, 42, 510, 24)
+
+local islandX = 20
+local islandY = 78
+local islandCol = 0
+
+for i, island in ipairs(islands) do
+	local islandName = island[1]
+	local islandPos = island[2]
+
+	button(islandTeleportCard, islandName, islandX, islandY, 245, 30, function()
+		teleportToIsland(islandPos)
+	end)
+
+	islandY += 36
+
+	if islandY > 940 then
+		islandY = 78
+		islandX = 290
+		islandCol += 1
+	end
+end
+
+
 -- Farming
 farmAutoCard = card(farmingTab, "Auto Farming", 20, 20, 270, 330)
 
@@ -4120,7 +4322,7 @@ button(webhookCard, "Test Webhook", 20, 385, 310, 34, function(btn)
 end)
 
 -- Copy current config to clipboard
-local function prettyJSON(str)
+function prettyJSON(str)
 	local indent = 0
 	local inString = false
 	local escape = false
@@ -4161,7 +4363,7 @@ local function prettyJSON(str)
 	return table.concat(out)
 end
 
-local function copyCurrentConfig()
+function copyCurrentConfig()
 	local ok, data = pcall(function()
 		return HttpService:JSONEncode(Config)
 	end)
@@ -4181,6 +4383,17 @@ local function copyCurrentConfig()
 	return false
 end
 
+
+-- Setting: Compass Counter
+counterCard = card(settingTab, "Compass Counter", 20, 490, 360, 115)
+
+toggle(counterCard, "ShowCompassCounter", "Show Compass Counter", 20, 45, 280, 34, function(state)
+	setCompassCounter(state)
+end)
+
+label(counterCard, "Hiện số Compass / Silver / Golden trên góc trái màn hình.", 20, 85, 320, 24)
+
+
 -- Setting: Config Manager
 configCard = card(settingTab, "Config Manager", 400, 20, 210, 500)
 
@@ -4196,7 +4409,7 @@ configNameBox = textbox(configCard, "Tên config", 15, 68, 180, 32,
 )
 
 label(configCard, "Selected: " .. (Config.SelectedConfig ~= "" and Config.SelectedConfig or "None"), 15, 110, 180, 22)
-local selectedLabel = configCard:FindFirstChildWhichIsA("TextLabel", true)
+selectedLabel = configCard:FindFirstChildWhichIsA("TextLabel", true)
 
 configList = Instance.new("ScrollingFrame")
 configList.Parent = configCard
@@ -4391,6 +4604,7 @@ refreshConfigList()
 refreshAll()
 updateScrollCanvas(settingTab, 120)
 updateScrollCanvas(farmingTab, 120)
+updateScrollCanvas(teleportTab, 120)
 updateScrollCanvas(mainTab, 120)
 
 -- Ưu tiên Auto Wood Rod Quest khi khởi động hub.
@@ -4425,6 +4639,10 @@ end
 
 if Config.AutoBeriGiftBox then
 	runAutoBeriGiftBox()
+end
+
+if Config.ShowCompassCounter then
+	setCompassCounter(true)
 end
 
 forceTopLayer(gui)
