@@ -3639,6 +3639,73 @@ settingTab = createTab("Setting", 3)
 
 
 --// TELEPORT LOGIC
+
+function findFruitObjectByName(fruitName)
+	fruitName = tostring(fruitName or ""):gsub("^%s+", ""):gsub("%s+$", "")
+	if fruitName == "" then return nil end
+
+	local lowerName = fruitName:lower()
+
+	-- Ưu tiên match đúng tên trong workspace.
+	local exact = workspace:FindFirstChild(fruitName)
+	if exact then return exact end
+
+	-- Nếu người dùng nhập thiếu chữ Fruit, thử tự thêm.
+	if not lowerName:find("fruit") then
+		local withFruit = fruitName .. " Fruit"
+		exact = workspace:FindFirstChild(withFruit)
+		if exact then return exact end
+	end
+
+	-- Fallback: tìm gần đúng theo tên.
+	for _, obj in ipairs(workspace:GetChildren()) do
+		local objName = tostring(obj.Name or ""):lower()
+		if objName == lowerName or objName:find(lowerName, 1, true) then
+			return obj
+		end
+
+		if not lowerName:find("fruit") and objName:find(lowerName, 1, true) and objName:find("fruit", 1, true) then
+			return obj
+		end
+	end
+
+	return nil
+end
+
+function getTeleportPartFromObject(obj)
+	if not obj then return nil end
+
+	if obj:IsA("Tool") then
+		return obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart", true)
+	elseif obj:IsA("Model") then
+		return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+	elseif obj:IsA("BasePart") then
+		return obj
+	end
+
+	return obj:FindFirstChildWhichIsA("BasePart", true)
+end
+
+function teleportToFruitName(fruitName)
+	local obj = findFruitObjectByName(fruitName)
+
+	if not obj then
+		warn("[PennyHub] Không tìm thấy fruit:", fruitName)
+		return false
+	end
+
+	local part = getTeleportPartFromObject(obj)
+	if not part then
+		warn("[PennyHub] Tìm thấy fruit nhưng không thấy Part/Handle:", obj.Name)
+		return false
+	end
+
+	teleportToIsland(part.Position)
+	print("[PennyHub] Teleported to fruit:", obj.Name)
+	return true
+end
+
+
 function teleportToIsland(pos)
 	if not pos then return end
 
@@ -4129,6 +4196,36 @@ for i, island in ipairs(islands) do
 end
 
 
+
+fruitTeleportCard = card(teleportTab, "Fruit Teleport", 20, 1080, 560, 170)
+
+label(fruitTeleportCard, "Nhập tên fruit trong workspace rồi bấm TP.", 20, 45, 420, 24)
+label(fruitTeleportCard, "Ví dụ: Luck Fruit hoặc chỉ cần nhập Luck.", 20, 70, 420, 24)
+
+fruitNameBox = textbox(fruitTeleportCard, "Luck Fruit", 20, 105, 260, 32,
+	function()
+		return getgenv().PennyFruitTeleportName or "Luck Fruit"
+	end,
+	function(value)
+		getgenv().PennyFruitTeleportName = tostring(value or "")
+	end,
+	false
+)
+
+button(fruitTeleportCard, "TP To Fruit", 300, 105, 120, 32, function()
+	local name = fruitNameBox and fruitNameBox.Text or getgenv().PennyFruitTeleportName or "Luck Fruit"
+	teleportToFruitName(name)
+end)
+
+button(fruitTeleportCard, "TP Luck Fruit", 430, 105, 100, 32, function()
+	getgenv().PennyFruitTeleportName = "Luck Fruit"
+	if fruitNameBox then fruitNameBox.Text = "Luck Fruit" end
+	teleportToFruitName("Luck Fruit")
+end)
+
+label(fruitTeleportCard, "Nếu fruit chưa spawn trong workspace thì sẽ báo warn.", 20, 140, 440, 24)
+
+
 -- Farming
 farmAutoCard = card(farmingTab, "Auto Farming", 20, 20, 270, 330)
 
@@ -4604,7 +4701,7 @@ refreshConfigList()
 refreshAll()
 updateScrollCanvas(settingTab, 120)
 updateScrollCanvas(farmingTab, 120)
-updateScrollCanvas(teleportTab, 120)
+updateScrollCanvas(teleportTab, 220)
 updateScrollCanvas(mainTab, 120)
 
 -- Ưu tiên Auto Wood Rod Quest khi khởi động hub.
